@@ -1,0 +1,32 @@
+[project]
+name = "agent-benchmarks"
+version = "0.1.0"
+description = "Benchmark suites for the Lightpanda agent."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "datasets>=2.14",
+]
+
+[project.scripts]
+assistantbench-run = "agent_benchmarks.assistantbench.run:main"
+assistantbench-grade = "agent_benchmarks.assistantbench.grade:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agent_benchmarks"]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.6",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
