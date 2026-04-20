@@ -75,14 +75,20 @@ def _run_single(
     task: str,
     provider: str,
     model: str | None,
+    user_agent: str | None,
+    attachment: Path | None,
     timeout_s: float,
 ) -> tuple[str, float, bool, str, int | None]:
     """Run a single task through lightpanda. Returns (prediction, duration_s, timed_out, stderr_tail, returncode)."""
     cmd: list[str] = [str(lightpanda), "agent", "--provider", provider]
     if model:
         cmd += ["--model", model]
+    if user_agent:
+        cmd += ["--user-agent", user_agent]
     cmd += ["--system-prompt", SYSTEM_PROMPT]
     cmd += ["--task", TASK_PROMPT_TEMPLATE.format(task=task)]
+    if attachment is not None:
+        cmd += ["--task-attachment", str(attachment)]
 
     env = dict(os.environ)
 
@@ -94,6 +100,8 @@ def _run_single(
             cmd,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=timeout_s,
             env=env,
             check=False,
@@ -154,9 +162,12 @@ def main(argv: list[str] | None = None) -> int:
         help="GAIA level (default: 1 — shortest tool-use chains, web-browsing focused)",
     )
     parser.add_argument(
-        "--keep-attachments",
+        "--skip-attachments",
         action="store_true",
-        help="Include rows with attached files (default: filter out — Lightpanda can't read PDFs/audio/images)",
+        help="Skip rows with attached files. Default is to include them, even though "
+        "Lightpanda can't read PDFs/audio/images — skipped tasks score 0 and the full "
+        "Level-N score is what the GAIA paper reports. Use this flag only when you "
+        "want to isolate agent performance on text-only tasks.",
     )
     parser.add_argument("--limit", type=int, default=None, help="Run at most N tasks")
     parser.add_argument("--workers", type=int, default=1, help="Parallel lightpanda subprocesses")
@@ -171,6 +182,12 @@ def main(argv: list[str] | None = None) -> int:
         "--provider", default="gemini", help="Lightpanda agent provider (default: gemini)"
     )
     parser.add_argument("--model", default=None, help="Override default model for the provider")
+    parser.add_argument(
+        "--user-agent",
+        default=None,
+        help='Override the browser User-Agent (forwarded to lightpanda --user-agent). '
+        'Cannot contain "Mozilla" per Lightpanda\'s policy.',
+    )
     parser.add_argument(
         "--out-dir",
         type=Path,
@@ -219,11 +236,19 @@ def main(argv: list[str] | None = None) -> int:
     ds = load_dataset("gaia-benchmark/GAIA", config, split=args.split)
     rows: list[dict[str, Any]] = list(ds)
 
-    if not args.keep_attachments:
+    # Materialize the dataset snapshot locally so we can point `--task-attachment`
+    # at real file paths. Only needed when attachments aren't skipped.
+    snapshot_dir: Path | None = None
+    if not args.skip_attachments and any((r.get("file_name") or "").strip() for r in rows):
+        from huggingface_hub import snapshot_download  # type: ignore[import-not-found]
+        print("Downloading GAIA dataset snapshot for attachments...", file=sys.stderr)
+        snapshot_dir = Path(snapshot_download(repo_id="gaia-benchmark/GAIA", repo_type="dataset"))
+
+    if args.skip_attachments:
         before = len(rows)
         rows = [r for r in rows if not (r.get("file_name") or "").strip()]
         print(
-            f"Filtered attachments: {before - len(rows)}/{before} rows dropped (kept {len(rows)})",
+            f"Skipped attachments: {before - len(rows)}/{before} rows dropped (kept {len(rows)})",
             file=sys.stderr,
         )
 
@@ -242,11 +267,19 @@ def main(argv: list[str] | None = None) -> int:
     results_lock_file = predictions_path.open("a")
 
     def _work(row: dict[str, Any]) -> dict[str, Any]:
+        attachment: Path | None = None
+        file_name = (row.get("file_name") or "").strip()
+        if file_name and snapshot_dir is not None:
+            attachment = snapshot_dir / row["file_path"]
+            if not attachment.exists():
+                attachment = None
         pred, duration_s, timed_out, stderr_tail, rc = _run_single(
             lightpanda=lightpanda,
             task=row["Question"],
             provider=args.provider,
             model=args.model,
+            user_agent=args.user_agent,
+            attachment=attachment,
             timeout_s=args.timeout,
         )
         return {
@@ -258,6 +291,7 @@ def main(argv: list[str] | None = None) -> int:
             "timed_out": timed_out,
             "returncode": rc,
             "level": row.get("Level"),
+            "file_name": file_name or None,
             "stderr_tail": stderr_tail,
         }
 

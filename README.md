@@ -9,8 +9,10 @@ own runner, grader, and README.
 - [`assistantbench`](src/agent_benchmarks/assistantbench/README.md) — 214
   live-web QA tasks from [Yoran et al., EMNLP 2024](https://arxiv.org/abs/2407.15711).
 - [`gaia`](src/agent_benchmarks/gaia/README.md) — [GAIA](https://arxiv.org/abs/2311.12983)
-  Level-1 web-browsing subset (no-attachment tasks), graded with the
-  paper's exact-match rubric. Requires an `HF_TOKEN` (gated dataset).
+  Level-1 validation split (53 tasks), graded with the paper's
+  exact-match rubric. Requires an `HF_TOKEN` (gated dataset). 11 of
+  the 53 tasks have attached PDFs/images/audio that Lightpanda can't
+  read and will score 0 — matches the published-baseline scope.
 
 ## Current results
 
@@ -21,7 +23,7 @@ roughly ±10 pp per run, so treat single-digit swings as noise.
 | Suite | Split | n | Strict | Empty | Notes |
 |---|---|---|---|---|---|
 | AssistantBench | validation | 33 | **36.4%** | 0 | Paper's GPT-4 baseline ≈ 25% strict |
-| GAIA (Level 1, no-attachment) | validation | 42 | **35.7%** | 0 | Paper's GPT-4+tools baseline ≈ 30% strict |
+| GAIA Level 1 | validation | 53 | **26.4%** | 10 | Paper's GPT-4+tools baseline ≈ 30% strict. Includes 11 attachment tasks: PNG/MP3/PY/TXT are fed to the model via `--task-attachment` (2 correct so far); DOCX/XLSX/PPTX are unsupported by zenai's mime table and score 0. |
 
 Strict counts an answer correct iff its per-task score clears the suite's
 threshold (≥ 0.5 for AssistantBench's token-F1; ≡ 1.0 for GAIA's exact match).

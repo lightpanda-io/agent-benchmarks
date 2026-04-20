@@ -75,12 +75,15 @@ def _run_single(
     task: str,
     provider: str,
     model: str | None,
+    user_agent: str | None,
     timeout_s: float,
 ) -> tuple[str, float, bool, str, int | None]:
     """Run a single task through lightpanda. Returns (prediction, duration_s, timed_out, stderr_tail, returncode)."""
     cmd: list[str] = [str(lightpanda), "agent", "--provider", provider]
     if model:
         cmd += ["--model", model]
+    if user_agent:
+        cmd += ["--user-agent", user_agent]
     cmd += ["--system-prompt", SYSTEM_PROMPT]
     cmd += ["--task", TASK_PROMPT_TEMPLATE.format(task=task)]
 
@@ -94,6 +97,8 @@ def _run_single(
             cmd,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=timeout_s,
             env=env,
             check=False,
@@ -160,6 +165,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--model", default=None, help="Override default model for the provider")
     parser.add_argument(
+        "--user-agent",
+        default=None,
+        help='Override the browser User-Agent (forwarded to lightpanda --user-agent). '
+        'Cannot contain "Mozilla" per Lightpanda\'s policy.',
+    )
+    parser.add_argument(
         "--out-dir",
         type=Path,
         default=None,
@@ -218,6 +229,7 @@ def main(argv: list[str] | None = None) -> int:
             task=row["task"],
             provider=args.provider,
             model=args.model,
+            user_agent=args.user_agent,
             timeout_s=args.timeout,
         )
         return {

@@ -1,18 +1,21 @@
-# GAIA (web subset)
+# GAIA
 
 Drives the `lightpanda agent` one-shot mode against the [GAIA](https://arxiv.org/abs/2311.12983)
-benchmark's pure-web-browsing subset — Level 1 tasks with no attached
-files — and grades predictions with a port of the paper's exact-match
-rubric.
+benchmark and grades predictions with a port of the paper's
+exact-match rubric.
 
 ## Scope
 
 GAIA has 3 levels (1 = shortest tool-use chains, 3 = longest) and many
-tasks include attached files (PDF, image, audio). Lightpanda can't
-consume attachments, so `gaia-run` defaults to **Level 1 + no
-attachments** (~30–50 rows in the `validation` split). Pass
-`--level 2 | 3` to try harder levels, or `--keep-attachments` to see
-the filter-out count.
+tasks include attached files (PDF, image, audio). `gaia-run` defaults
+to **Level 1, all tasks** (53 rows in the `validation` split) so the
+score is apples-to-apples with the paper's published Level-1 baseline.
+
+Lightpanda has no PDF/audio/image reader, so tasks with attachments
+(11/53 on Level 1) will score 0 — same as any other text-only browser.
+To isolate agent performance on tasks the stack can *actually* solve,
+pass `--skip-attachments` (runs only the 42 text-only rows). Pass
+`--level 2` or `--level 3` for harder levels.
 
 ## Prerequisites
 
@@ -76,7 +79,7 @@ results/
 
 - `--level {1,2,3}` — default 1
 - `--split {validation,test}` — default `validation`; `test` answers are private
-- `--keep-attachments` — include tasks with attached files (will score 0 without a multimodal fallback)
+- `--skip-attachments` — exclude tasks with attached files (default: include, they score 0 to match the paper's baseline scope)
 - `--limit N` — cap the number of tasks
 - `--workers N` — parallel subprocesses (default 1). Be gentle on live sites.
 - `--timeout SECONDS` — per-task timeout (default 300)
