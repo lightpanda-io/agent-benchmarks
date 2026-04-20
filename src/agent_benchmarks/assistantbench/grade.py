@@ -181,11 +181,7 @@ def score_pair(prediction: Any, gold: Any) -> float:
         used_g: set[int] = set()
         pairs: list[float] = []
         flat = sorted(
-            (
-                (scores[i][j], i, j)
-                for i in range(len(p))
-                for j in range(len(g))
-            ),
+            ((scores[i][j], i, j) for i in range(len(p)) for j in range(len(g))),
             key=lambda t: -t[0],
         )
         for s, i, j in flat:

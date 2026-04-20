@@ -103,8 +103,16 @@ def _run_single(
         returncode = proc.returncode
     except subprocess.TimeoutExpired as e:
         timed_out = True
-        stdout = (e.stdout or b"").decode("utf-8", errors="replace") if isinstance(e.stdout, bytes) else (e.stdout or "")
-        stderr = (e.stderr or b"").decode("utf-8", errors="replace") if isinstance(e.stderr, bytes) else (e.stderr or "")
+        stdout = (
+            (e.stdout or b"").decode("utf-8", errors="replace")
+            if isinstance(e.stdout, bytes)
+            else (e.stdout or "")
+        )
+        stderr = (
+            (e.stderr or b"").decode("utf-8", errors="replace")
+            if isinstance(e.stderr, bytes)
+            else (e.stderr or "")
+        )
 
     duration_s = time.monotonic() - started
 
@@ -147,7 +155,9 @@ def main(argv: list[str] | None = None) -> int:
         default=Path("zig-out/bin/lightpanda"),
         help="Path to the lightpanda binary. If relative, tries CWD then <pyproject>/../ (default: zig-out/bin/lightpanda)",
     )
-    parser.add_argument("--provider", default="gemini", help="Lightpanda agent provider (default: gemini)")
+    parser.add_argument(
+        "--provider", default="gemini", help="Lightpanda agent provider (default: gemini)"
+    )
     parser.add_argument("--model", default=None, help="Override default model for the provider")
     parser.add_argument(
         "--out-dir",
@@ -228,7 +238,11 @@ def main(argv: list[str] | None = None) -> int:
                 result = _work(row)
                 results_lock_file.write(json.dumps(result) + "\n")
                 results_lock_file.flush()
-                status = "TIMEOUT" if result["timed_out"] else ("OK" if result["prediction"] else "EMPTY")
+                status = (
+                    "TIMEOUT"
+                    if result["timed_out"]
+                    else ("OK" if result["prediction"] else "EMPTY")
+                )
                 print(
                     f"[{idx}/{len(pending)}] {status} {result['duration_s']:.1f}s {result['id'][:12]} — {row['task'][:80]}",
                     file=sys.stderr,
@@ -242,7 +256,11 @@ def main(argv: list[str] | None = None) -> int:
                     results_lock_file.write(json.dumps(result) + "\n")
                     results_lock_file.flush()
                     done += 1
-                    status = "TIMEOUT" if result["timed_out"] else ("OK" if result["prediction"] else "EMPTY")
+                    status = (
+                        "TIMEOUT"
+                        if result["timed_out"]
+                        else ("OK" if result["prediction"] else "EMPTY")
+                    )
                     print(
                         f"[{done}/{len(pending)}] {status} {result['duration_s']:.1f}s {result['id'][:12]}",
                         file=sys.stderr,
