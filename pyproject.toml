@@ -11,6 +11,8 @@ dependencies = [
 [project.scripts]
 assistantbench-run = "agent_benchmarks.assistantbench.run:main"
 assistantbench-grade = "agent_benchmarks.assistantbench.grade:main"
+gaia-run = "agent_benchmarks.gaia.run:main"
+gaia-grade = "agent_benchmarks.gaia.grade:main"
 
 [build-system]
 requires = ["hatchling"]

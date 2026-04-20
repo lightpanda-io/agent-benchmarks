@@ -8,6 +8,9 @@ own runner, grader, and README.
 
 - [`assistantbench`](src/agent_benchmarks/assistantbench/README.md) — 214
   live-web QA tasks from [Yoran et al., EMNLP 2024](https://arxiv.org/abs/2407.15711).
+- [`gaia`](src/agent_benchmarks/gaia/README.md) — [GAIA](https://arxiv.org/abs/2311.12983)
+  Level-1 web-browsing subset (no-attachment tasks), graded with the
+  paper's exact-match rubric. Requires an `HF_TOKEN` (gated dataset).
 
 ## Setup
 
