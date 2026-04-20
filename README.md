@@ -12,6 +12,25 @@ own runner, grader, and README.
   Level-1 web-browsing subset (no-attachment tasks), graded with the
   paper's exact-match rubric. Requires an `HF_TOKEN` (gated dataset).
 
+## Current results
+
+Lightpanda agent with `gemini-flash-lite-latest` via zenai, 8 workers, default
+system prompts. One run per suite; live-web variance at these sample sizes is
+roughly ±10 pp per run, so treat single-digit swings as noise.
+
+| Suite | Split | n | Strict | Empty | Notes |
+|---|---|---|---|---|---|
+| AssistantBench | validation | 33 | **36.4%** | 0 | Paper's GPT-4 baseline ≈ 25% strict |
+| GAIA (Level 1, no-attachment) | validation | 42 | **35.7%** | 0 | Paper's GPT-4+tools baseline ≈ 30% strict |
+
+Strict counts an answer correct iff its per-task score clears the suite's
+threshold (≥ 0.5 for AssistantBench's token-F1; ≡ 1.0 for GAIA's exact match).
+Empty counts tasks where the agent emitted nothing — this was 10 on GAIA and
+1 on AssistantBench before the post-loop synthesis turn was added to the
+browser's agent (`src/agent/Agent.zig`); with the fix in place, both are zero.
+
+Reproducing: `uv run <suite>-run --workers 8` from the browser repo root.
+
 ## Setup
 
 ```bash
