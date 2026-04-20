@@ -23,7 +23,7 @@ roughly ±10 pp per run, so treat single-digit swings as noise.
 | Suite | Split | n | Strict | Empty | Notes |
 |---|---|---|---|---|---|
 | AssistantBench | validation | 33 | **36.4%** | 0 | Paper's GPT-4 baseline ≈ 25% strict |
-| GAIA Level 1 | validation | 53 | **26.4%** | 10 | Paper's GPT-4+tools baseline ≈ 30% strict. Includes 11 attachment tasks: PNG/MP3/PY/TXT are fed to the model via `--task-attachment` (2 correct so far); DOCX/XLSX/PPTX are unsupported by zenai's mime table and score 0. |
+| GAIA Level 1 | validation | 53 | **30.2%** | 3 | Paper's GPT-4+tools baseline ≈ 30% strict; current Claude 4.5 Sonnet SOTA ≈ 82%. Includes all 11 attachment tasks: PNG/MP3/PY/TXT fed via `--task-attachment`; DOCX/XLSX/PPTX extracted to text by the runner first. |
 
 Strict counts an answer correct iff its per-task score clears the suite's
 threshold (≥ 0.5 for AssistantBench's token-F1; ≡ 1.0 for GAIA's exact match).

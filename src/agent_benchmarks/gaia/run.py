@@ -27,6 +27,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -35,6 +36,68 @@ from typing import Any
 from datasets import load_dataset  # type: ignore[import-not-found]
 
 from .grade import grade_predictions
+
+
+OFFICE_EXTS = {".docx", ".xlsx", ".pptx"}
+
+
+def _extract_office_text(path: Path) -> str:
+    """Extract a plain-text representation of an office document. Returns a
+    format that preserves as much structure as the model can use: tables
+    emit one row per line with tab-separated cells; pptx emits per-slide
+    headings. Visual-only information (cell colors, shapes) is lost —
+    tasks depending on it will still score 0."""
+    ext = path.suffix.lower()
+    if ext == ".docx":
+        from docx import Document  # type: ignore[import-not-found]
+
+        doc = Document(str(path))
+        parts: list[str] = [p.text for p in doc.paragraphs if p.text]
+        for table in doc.tables:
+            for row in table.rows:
+                parts.append("\t".join(cell.text for cell in row.cells))
+        return "\n".join(parts)
+    if ext == ".xlsx":
+        from openpyxl import load_workbook  # type: ignore[import-not-found]
+
+        wb = load_workbook(str(path), data_only=True)
+        out: list[str] = []
+        for sheet_name in wb.sheetnames:
+            sheet = wb[sheet_name]
+            out.append(f"=== Sheet: {sheet_name} ===")
+            for row in sheet.iter_rows(values_only=True):
+                out.append("\t".join("" if c is None else str(c) for c in row))
+        return "\n".join(out)
+    if ext == ".pptx":
+        from pptx import Presentation  # type: ignore[import-not-found]
+
+        prs = Presentation(str(path))
+        out: list[str] = []
+        for i, slide in enumerate(prs.slides, 1):
+            out.append(f"=== Slide {i} ===")
+            for shape in slide.shapes:
+                text = getattr(shape, "text", None)
+                if text:
+                    out.append(text)
+        return "\n".join(out)
+    raise ValueError(f"unknown office extension: {ext}")
+
+
+def _preprocess_attachment(path: Path) -> Path:
+    """Normalize an attachment for Lightpanda. Office docs are extracted to
+    plain text written to a sibling .txt tempfile so Lightpanda's text-file
+    handler picks them up. Other formats pass through untouched."""
+    if path.suffix.lower() not in OFFICE_EXTS:
+        return path
+    text = _extract_office_text(path)
+    fd, tmp = tempfile.mkstemp(suffix=f"__{path.name}.txt", text=True)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(text)
+    except Exception:
+        os.unlink(tmp)
+        raise
+    return Path(tmp)
 
 
 STDERR_TAIL_BYTES = 8 * 1024
@@ -185,7 +248,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--user-agent",
         default=None,
-        help='Override the browser User-Agent (forwarded to lightpanda --user-agent). '
+        help="Override the browser User-Agent (forwarded to lightpanda --user-agent). "
         'Cannot contain "Mozilla" per Lightpanda\'s policy.',
     )
     parser.add_argument(
@@ -241,6 +304,7 @@ def main(argv: list[str] | None = None) -> int:
     snapshot_dir: Path | None = None
     if not args.skip_attachments and any((r.get("file_name") or "").strip() for r in rows):
         from huggingface_hub import snapshot_download  # type: ignore[import-not-found]
+
         print("Downloading GAIA dataset snapshot for attachments...", file=sys.stderr)
         snapshot_dir = Path(snapshot_download(repo_id="gaia-benchmark/GAIA", repo_type="dataset"))
 
@@ -268,20 +332,37 @@ def main(argv: list[str] | None = None) -> int:
 
     def _work(row: dict[str, Any]) -> dict[str, Any]:
         attachment: Path | None = None
+        tmp_to_delete: Path | None = None
         file_name = (row.get("file_name") or "").strip()
         if file_name and snapshot_dir is not None:
-            attachment = snapshot_dir / row["file_path"]
-            if not attachment.exists():
-                attachment = None
-        pred, duration_s, timed_out, stderr_tail, rc = _run_single(
-            lightpanda=lightpanda,
-            task=row["Question"],
-            provider=args.provider,
-            model=args.model,
-            user_agent=args.user_agent,
-            attachment=attachment,
-            timeout_s=args.timeout,
-        )
+            raw = snapshot_dir / row["file_path"]
+            if raw.exists():
+                try:
+                    attachment = _preprocess_attachment(raw)
+                    if attachment != raw:
+                        tmp_to_delete = attachment
+                except Exception as e:
+                    print(
+                        f"warn: preprocess failed for {raw}: {e}; passing raw path",
+                        file=sys.stderr,
+                    )
+                    attachment = raw
+        try:
+            pred, duration_s, timed_out, stderr_tail, rc = _run_single(
+                lightpanda=lightpanda,
+                task=row["Question"],
+                provider=args.provider,
+                model=args.model,
+                user_agent=args.user_agent,
+                attachment=attachment,
+                timeout_s=args.timeout,
+            )
+        finally:
+            if tmp_to_delete is not None:
+                try:
+                    tmp_to_delete.unlink()
+                except OSError:
+                    pass
         return {
             "id": row["task_id"],
             "task": row["Question"],

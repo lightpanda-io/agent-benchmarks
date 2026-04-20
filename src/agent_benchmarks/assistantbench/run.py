@@ -167,7 +167,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--user-agent",
         default=None,
-        help='Override the browser User-Agent (forwarded to lightpanda --user-agent). '
+        help="Override the browser User-Agent (forwarded to lightpanda --user-agent). "
         'Cannot contain "Mozilla" per Lightpanda\'s policy.',
     )
     parser.add_argument(
