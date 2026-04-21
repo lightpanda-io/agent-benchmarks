@@ -16,14 +16,19 @@ own runner, grader, and README.
 
 ## Current results
 
-Lightpanda agent with `gemini-flash-lite-latest` via zenai, 8 workers, default
-system prompts. One run per suite; live-web variance at these sample sizes is
-roughly ±10 pp per run, so treat single-digit swings as noise.
+Lightpanda agent via zenai, default system prompts. One run per (suite, model);
+live-web variance at these sample sizes is roughly ±10 pp per run, so treat
+single-digit swings as noise.
 
-| Suite | Split | n | Strict | Empty | Notes |
-|---|---|---|---|---|---|
-| AssistantBench | validation | 33 | **36.4%** | 0 | Paper's GPT-4 baseline ≈ 25% strict |
-| GAIA Level 1 | validation | 53 | **30.2%** | 3 | Paper's GPT-4+tools baseline ≈ 30% strict; current Claude 4.5 Sonnet SOTA ≈ 82%. Includes all 11 attachment tasks: PNG/MP3/PY/TXT fed via `--task-attachment`; DOCX/XLSX/PPTX extracted to text by the runner first. |
+| Suite | Model | Split | n | Strict | Empty | Notes |
+|---|---|---|---|---|---|---|
+| AssistantBench | `gemini-flash-lite-latest` | validation | 33 | **36.4%** | 0 | 8 workers. Paper's GPT-4 baseline ≈ 25% strict |
+| AssistantBench | `gemini-3-flash-preview` | validation | 33 | **54.5%** | 2 | 4 workers, 600s timeout |
+| GAIA Level 1 | `gemini-flash-lite-latest` | validation | 53 | **30.2%** | 3 | 8 workers, 300s timeout. Paper's GPT-4+tools baseline ≈ 30% strict |
+| GAIA Level 1 | `gemini-3-flash-preview` | validation | 53 | **73.6%** | 3 | 4 workers, 600s timeout. Claude 4.5 Sonnet SOTA ≈ 82% |
+
+GAIA Level 1 includes all 11 attachment tasks: PNG/MP3/PY/TXT fed via
+`--task-attachment`; DOCX/XLSX/PPTX extracted to text by the runner first.
 
 Strict counts an answer correct iff its per-task score clears the suite's
 threshold (≥ 0.5 for AssistantBench's token-F1; ≡ 1.0 for GAIA's exact match).
@@ -31,7 +36,8 @@ Empty counts tasks where the agent emitted nothing — this was 10 on GAIA and
 1 on AssistantBench before the post-loop synthesis turn was added to the
 browser's agent (`src/agent/Agent.zig`); with the fix in place, both are zero.
 
-Reproducing: `uv run <suite>-run --workers 8` from the browser repo root.
+Reproducing: `uv run <suite>-run --workers <N>` from the browser repo root
+(`--workers 4` recommended for flash-preview to stay under Gemini rate limits).
 
 ## Setup
 

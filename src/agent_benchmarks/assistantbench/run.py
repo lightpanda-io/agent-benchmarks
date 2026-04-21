@@ -49,7 +49,7 @@ For each task:
 2. Navigate: use goto, tree, markdown, extract, findElement to inspect pages.
 3. Answer terse: output only the answer. For lists, one item per line. For numbers, the bare number (no units, no prose). For URLs, the bare URL.
 4. Small-candidate questions ("A, B, or C", yes/no): always pick one — never abstain.
-5. If a site returns errors, a tool call repeatedly fails, or you cannot extract the needed info, fall back to your best-effort answer from prior knowledge rather than staying empty. Model knowledge is a valid last resort — preferable to no answer.
+5. Be decisive. Target ≤10 tool calls per task. If you hit that budget, or a site returns errors, or a tool call repeatedly fails, or you cannot extract the needed info, commit to your best-effort answer from prior knowledge rather than continuing to search. Model knowledge is a valid last resort — preferable to no answer.
 6. Only respond "unknown" if you have exhausted navigation AND prior knowledge gives no lead.
 
 Search-engine use:

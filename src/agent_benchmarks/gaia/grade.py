@@ -44,23 +44,18 @@ def _normalize_str(s: str) -> str:
     return " ".join(tokens)
 
 
-_NUM_RE = re.compile(r"-?\d+(?:\.\d+)?")
-
-
 def _parse_number(s: str) -> float | None:
+    """Parse a prediction as a number after stripping commas, currency symbols,
+    and a trailing percent. Returns None if the string still isn't a clean
+    number — we deliberately do NOT fall back to a regex-extracted first match,
+    because that would silently accept CoT scratchpad like `$: if P3 fires...`
+    as the digit 3."""
     s = s.strip().replace(",", "").rstrip("%")
     s = s.lstrip("$€£¥")
     try:
         return float(s)
     except ValueError:
-        pass
-    m = _NUM_RE.search(s)
-    if m:
-        try:
-            return float(m.group(0))
-        except ValueError:
-            return None
-    return None
+        return None
 
 
 def _is_numeric_gold(gold: str) -> bool:
