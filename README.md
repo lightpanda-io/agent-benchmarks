@@ -26,6 +26,7 @@ single-digit swings as noise.
 | AssistantBench | `gemini-3-flash-preview` | validation | 33 | **54.5%** | 2 | 4 workers, 600s timeout |
 | GAIA Level 1 | `gemini-flash-lite-latest` | validation | 53 | **30.2%** | 3 | 8 workers, 300s timeout. Paper's GPT-4+tools baseline ≈ 30% strict |
 | GAIA Level 1 | `gemini-3-flash-preview` | validation | 53 | **73.6%** | 3 | 4 workers, 600s timeout. Claude 4.5 Sonnet SOTA ≈ 82% |
+| GAIA Level 1 | `gemini-3.1-pro-preview` | validation | 53 | **77.4%** | 5 | 4 workers; tasks that hit the 600s limit were retried at 1200s to give Pro enough reasoning time |
 
 GAIA Level 1 includes all 11 attachment tasks: PNG/MP3/PY/TXT fed via
 `--task-attachment`; DOCX/XLSX/PPTX extracted to text by the runner first.
