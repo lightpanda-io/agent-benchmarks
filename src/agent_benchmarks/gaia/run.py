@@ -25,18 +25,22 @@ import argparse
 import concurrent.futures
 import json
 import os
-import subprocess
 import sys
 import tempfile
-import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from datasets import load_dataset  # type: ignore[import-not-found]
 
+from ..common import (
+    load_completed_ids,
+    print_lightpanda_missing,
+    resolve_lightpanda_binary,
+    run_lightpanda_task,
+    status_label,
+)
 from .grade import grade_predictions
-
 
 OFFICE_EXTS = {".docx", ".xlsx", ".pptx"}
 
@@ -100,8 +104,6 @@ def _preprocess_attachment(path: Path) -> Path:
     return Path(tmp)
 
 
-STDERR_TAIL_BYTES = 8 * 1024
-
 # benchmarks/src/agent_benchmarks/gaia/run.py → benchmarks/
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
@@ -130,88 +132,6 @@ TASK_PROMPT_TEMPLATE = (
     "{task}\n\n"
     "Output only the exact answer (terse). No explanation, no units beyond what's asked, no markdown."
 )
-
-
-def _run_single(
-    *,
-    lightpanda: Path,
-    task: str,
-    provider: str,
-    model: str | None,
-    user_agent: str | None,
-    attachment: Path | None,
-    timeout_s: float,
-) -> tuple[str, float, bool, str, int | None]:
-    """Run a single task through lightpanda. Returns (prediction, duration_s, timed_out, stderr_tail, returncode)."""
-    cmd: list[str] = [str(lightpanda), "agent", "--provider", provider]
-    if model:
-        cmd += ["--model", model]
-    if user_agent:
-        cmd += ["--user-agent", user_agent]
-    cmd += ["--system-prompt", SYSTEM_PROMPT]
-    cmd += ["--task", TASK_PROMPT_TEMPLATE.format(task=task)]
-    if attachment is not None:
-        cmd += ["--task-attachment", str(attachment)]
-
-    env = dict(os.environ)
-
-    started = time.monotonic()
-    timed_out = False
-    returncode: int | None = None
-    try:
-        proc = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=timeout_s,
-            env=env,
-            check=False,
-        )
-        stdout = proc.stdout
-        stderr = proc.stderr
-        returncode = proc.returncode
-    except subprocess.TimeoutExpired as e:
-        timed_out = True
-        stdout = (
-            (e.stdout or b"").decode("utf-8", errors="replace")
-            if isinstance(e.stdout, bytes)
-            else (e.stdout or "")
-        )
-        stderr = (
-            (e.stderr or b"").decode("utf-8", errors="replace")
-            if isinstance(e.stderr, bytes)
-            else (e.stderr or "")
-        )
-
-    duration_s = time.monotonic() - started
-
-    if len(stderr) > STDERR_TAIL_BYTES:
-        stderr_tail = "...[truncated]...\n" + stderr[-STDERR_TAIL_BYTES:]
-    else:
-        stderr_tail = stderr
-
-    prediction = stdout.strip()
-    return prediction, duration_s, timed_out, stderr_tail, returncode
-
-
-def _load_completed(predictions_path: Path) -> set[str]:
-    if not predictions_path.exists():
-        return set()
-    completed: set[str] = set()
-    with predictions_path.open() as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                row = json.loads(line)
-                if row.get("id"):
-                    completed.add(row["id"])
-            except json.JSONDecodeError:
-                continue
-    return completed
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -264,15 +184,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    if args.lightpanda.is_absolute():
-        lightpanda = args.lightpanda
-    else:
-        candidates = [Path.cwd() / args.lightpanda, PROJECT_ROOT.parent / args.lightpanda]
-        lightpanda = next((c for c in candidates if c.exists()), candidates[0])
-    lightpanda = lightpanda.resolve()
+    lightpanda = resolve_lightpanda_binary(args.lightpanda, PROJECT_ROOT)
     if not lightpanda.exists():
-        print(f"error: lightpanda binary not found at {lightpanda}", file=sys.stderr)
-        print("hint: build first with `zig build -Doptimize=ReleaseFast`", file=sys.stderr)
+        print_lightpanda_missing(lightpanda)
         return 2
 
     if args.out_dir is None:
@@ -283,7 +197,7 @@ def main(argv: list[str] | None = None) -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
     predictions_path = out_dir / "predictions.jsonl"
 
-    completed = _load_completed(predictions_path) if args.resume else set()
+    completed = load_completed_ids(predictions_path) if args.resume else set()
     if completed:
         print(f"Resuming — skipping {len(completed)} already-completed task(s)", file=sys.stderr)
 
@@ -348,12 +262,13 @@ def main(argv: list[str] | None = None) -> int:
                     )
                     attachment = raw
         try:
-            pred, duration_s, timed_out, stderr_tail, rc = _run_single(
+            pred, duration_s, timed_out, stderr_tail, rc = run_lightpanda_task(
                 lightpanda=lightpanda,
-                task=row["Question"],
                 provider=args.provider,
                 model=args.model,
                 user_agent=args.user_agent,
+                system_prompt=SYSTEM_PROMPT,
+                task_prompt=TASK_PROMPT_TEMPLATE.format(task=row["Question"]),
                 attachment=attachment,
                 timeout_s=args.timeout,
             )
@@ -382,13 +297,8 @@ def main(argv: list[str] | None = None) -> int:
                 result = _work(row)
                 results_lock_file.write(json.dumps(result) + "\n")
                 results_lock_file.flush()
-                status = (
-                    "TIMEOUT"
-                    if result["timed_out"]
-                    else ("OK" if result["prediction"] else "EMPTY")
-                )
                 print(
-                    f"[{idx}/{len(pending)}] {status} {result['duration_s']:.1f}s {result['id'][:12]} — {row['Question'][:80]}",
+                    f"[{idx}/{len(pending)}] {status_label(result)} {result['duration_s']:.1f}s {result['id'][:12]} — {row['Question'][:80]}",
                     file=sys.stderr,
                 )
         else:
@@ -400,13 +310,8 @@ def main(argv: list[str] | None = None) -> int:
                     results_lock_file.write(json.dumps(result) + "\n")
                     results_lock_file.flush()
                     done += 1
-                    status = (
-                        "TIMEOUT"
-                        if result["timed_out"]
-                        else ("OK" if result["prediction"] else "EMPTY")
-                    )
                     print(
-                        f"[{done}/{len(pending)}] {status} {result['duration_s']:.1f}s {result['id'][:12]}",
+                        f"[{done}/{len(pending)}] {status_label(result)} {result['duration_s']:.1f}s {result['id'][:12]}",
                         file=sys.stderr,
                     )
     finally:

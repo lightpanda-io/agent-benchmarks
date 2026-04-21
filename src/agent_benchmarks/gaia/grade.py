@@ -31,6 +31,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from ..common import mean
 
 _ARTICLES = {"a", "an", "the"}
 _PUNCT_TABLE = str.maketrans("", "", string.punctuation)
@@ -173,42 +174,38 @@ def grade_predictions(predictions_path: Path) -> dict[str, Any]:
     durations = [t.get("duration_s", 0.0) for t, _, _ in scored]
 
     by_level: dict[str, list[tuple[float, float]]] = {}
+    per_task: list[dict[str, Any]] = []
     for t, s_strict, s_soft in scored:
-        level = str(t.get("level") or t.get("Level") or "?")
-        by_level.setdefault(level, []).append((s_strict, s_soft))
-
-    return {
-        "n_tasks": n,
-        "n_answered": answered,
-        "timeouts": timeouts,
-        "accuracy": _mean(s for _, s, _ in scored),
-        "accuracy_soft": _mean(s for _, _, s in scored),
-        "by_level": {
-            k: {
-                "n": len(v),
-                "accuracy": _mean(s for s, _ in v),
-                "accuracy_soft": _mean(s for _, s in v),
-            }
-            for k, v in sorted(by_level.items())
-        },
-        "avg_duration_s": _mean(durations),
-        "per_task": [
+        level = t.get("level") or t.get("Level")
+        by_level.setdefault(str(level) if level is not None else "?", []).append((s_strict, s_soft))
+        per_task.append(
             {
                 "id": t.get("id"),
-                "level": t.get("level") or t.get("Level"),
+                "level": level,
                 "score": s_strict,
                 "score_soft": s_soft,
                 "timed_out": bool(t.get("timed_out")),
                 "duration_s": t.get("duration_s"),
             }
-            for t, s_strict, s_soft in scored
-        ],
+        )
+
+    return {
+        "n_tasks": n,
+        "n_answered": answered,
+        "timeouts": timeouts,
+        "accuracy": mean(s for _, s, _ in scored),
+        "accuracy_soft": mean(s for _, _, s in scored),
+        "by_level": {
+            k: {
+                "n": len(v),
+                "accuracy": mean(s for s, _ in v),
+                "accuracy_soft": mean(s for _, s in v),
+            }
+            for k, v in sorted(by_level.items())
+        },
+        "avg_duration_s": mean(durations),
+        "per_task": per_task,
     }
-
-
-def _mean(xs) -> float:
-    xs = list(xs)
-    return sum(xs) / len(xs) if xs else 0.0
 
 
 def main(argv: list[str] | None = None) -> int:

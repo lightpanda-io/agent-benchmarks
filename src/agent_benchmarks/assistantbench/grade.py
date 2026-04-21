@@ -32,6 +32,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from ..common import mean
 
 _PUNCT_TABLE = str.maketrans("", "", string.punctuation)
 
@@ -176,7 +177,7 @@ def score_pair(prediction: Any, gold: Any) -> float:
         if not p:
             return 0.0
         # Best-alignment F1: greedy match by highest pairwise score.
-        scores = [[_pair_score(pi, gi) for gi in g] for pi in p]
+        scores = [[score_pair(pi, gi) for gi in g] for pi in p]
         used_p: set[int] = set()
         used_g: set[int] = set()
         pairs: list[float] = []
@@ -211,11 +212,6 @@ def score_pair(prediction: Any, gold: Any) -> float:
     return _token_f1(str(p), str(g))
 
 
-def _pair_score(pred: Any, gold: Any) -> float:
-    """Recursive scoring for list elements — may itself be dict/str/number."""
-    return score_pair(pred, gold)
-
-
 def grade_predictions(predictions_path: Path) -> dict[str, Any]:
     tasks: list[dict[str, Any]] = []
     with predictions_path.open() as f:
@@ -245,17 +241,17 @@ def grade_predictions(predictions_path: Path) -> dict[str, Any]:
         "n_tasks": n,
         "n_answered": answered,
         "timeouts": timeouts,
-        "accuracy_soft": _mean(s for _, s in scored),
-        "accuracy_strict": _mean(1.0 if s >= 0.5 else 0.0 for _, s in scored),
+        "accuracy_soft": mean(s for _, s in scored),
+        "accuracy_strict": mean(1.0 if s >= 0.5 else 0.0 for _, s in scored),
         "by_difficulty": {
             k: {
                 "n": len(v),
-                "accuracy_soft": _mean(v),
-                "accuracy_strict": _mean(1.0 if s >= 0.5 else 0.0 for s in v),
+                "accuracy_soft": mean(v),
+                "accuracy_strict": mean(1.0 if s >= 0.5 else 0.0 for s in v),
             }
             for k, v in sorted(by_diff.items())
         },
-        "avg_duration_s": _mean(durations),
+        "avg_duration_s": mean(durations),
         "per_task": [
             {
                 "id": t.get("id"),
@@ -267,11 +263,6 @@ def grade_predictions(predictions_path: Path) -> dict[str, Any]:
             for t, s in scored
         ],
     }
-
-
-def _mean(xs) -> float:
-    xs = list(xs)
-    return sum(xs) / len(xs) if xs else 0.0
 
 
 def main(argv: list[str] | None = None) -> int:
