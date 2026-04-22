@@ -16,26 +16,28 @@ own runner, grader, and README.
 
 ## Current results
 
-Lightpanda agent via zenai, default system prompts. One run per (suite, model);
-live-web variance at these sample sizes is roughly ±10 pp per run, so treat
-single-digit swings as noise.
+Lightpanda agent via zenai, default system prompts. Numbers below are
+means over 4 runs captured on 2026-04-22 with `gemini-3-flash-preview`,
+4 workers, 600s per-task timeout. Single-run variance is ±4–6 pp, so
+treat mean differences below that as noise; prefer re-running rather
+than reading into a single comparison.
 
-| Suite | Model | Split | n | Strict | Empty | Notes |
-|---|---|---|---|---|---|---|
-| AssistantBench | `gemini-flash-lite-latest` | validation | 33 | **36.4%** | 0 | 8 workers. Paper's GPT-4 baseline ≈ 25% strict |
-| AssistantBench | `gemini-3-flash-preview` | validation | 33 | **54.5%** | 2 | 4 workers, 600s timeout |
-| GAIA Level 1 | `gemini-flash-lite-latest` | validation | 53 | **30.2%** | 3 | 8 workers, 300s timeout. Paper's GPT-4+tools baseline ≈ 30% strict |
-| GAIA Level 1 | `gemini-3-flash-preview` | validation | 53 | **73.6%** | 3 | 4 workers, 600s timeout. Claude 4.5 Sonnet SOTA ≈ 82% |
-| GAIA Level 1 | `gemini-3.1-pro-preview` | validation | 53 | **77.4%** | 5 | 4 workers; tasks that hit the 600s limit were retried at 1200s to give Pro enough reasoning time |
+| Suite | Model | Split | n | Runs | Strict (mean ± stdev) | Best run | Notes |
+|---|---|---|---:|---:|---:|---:|---|
+| AssistantBench | `gemini-3-flash-preview` | validation | 33 | 4 | **61.4% ± 6.2 pp** | 69.7% | Paper's GPT-4 baseline ≈ 25% strict |
+| GAIA Level 1 | `gemini-3-flash-preview` | validation | 53 | 4 | **68.4% ± 4.2 pp** | 73.6% | Paper's GPT-4+tools baseline ≈ 30%. Claude 4.5 Sonnet SOTA ≈ 82% |
 
 GAIA Level 1 includes all 11 attachment tasks: PNG/MP3/PY/TXT fed via
 `--task-attachment`; DOCX/XLSX/PPTX extracted to text by the runner first.
 
 Strict counts an answer correct iff its per-task score clears the suite's
 threshold (≥ 0.5 for AssistantBench's token-F1; ≡ 1.0 for GAIA's exact match).
-Empty counts tasks where the agent emitted nothing — this was 10 on GAIA and
-1 on AssistantBench before the post-loop synthesis turn was added to the
-browser's agent (`src/agent/Agent.zig`); with the fix in place, both are zero.
+Empty answers and timeouts are both zero in practice after two recent
+agent/transport changes: a post-loop synthesis turn in
+`src/agent/Agent.zig` (forces a final answer when the tool-use loop
+exhausts), and automatic retry of transient HTTP failures in zenai
+(5xx, 429, and known flaky network errors). Earlier single-run numbers
+predate those and aren't directly comparable.
 
 Reproducing: `uv run <suite>-run --workers <N>` from the browser repo root
 (`--workers 4` recommended for flash-preview to stay under Gemini rate limits).
