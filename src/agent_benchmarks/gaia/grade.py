@@ -112,7 +112,7 @@ def _score_list(pred: str, gold: str, soft: bool) -> float:
         return 0.0
     # GAIA compares lists as sets after per-element rule.
     used: set[int] = set()
-    for gi, g_item in enumerate(gold_parts):
+    for _gi, g_item in enumerate(gold_parts):
         matched = False
         for pi, p_item in enumerate(pred_parts):
             if pi in used:

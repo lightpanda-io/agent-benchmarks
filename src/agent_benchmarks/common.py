@@ -7,13 +7,17 @@ factors out the common mechanics so suites can focus on their rubric.
 
 from __future__ import annotations
 
+import argparse
+import concurrent.futures
 import json
 import os
 import subprocess
 import sys
 import time
+from collections.abc import Callable, Iterable
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 STDERR_TAIL_BYTES = 8 * 1024
 
@@ -29,7 +33,10 @@ def run_lightpanda_task(
     attachment: Path | None = None,
     timeout_s: float,
 ) -> tuple[str, float, bool, str, int | None]:
-    """Run a single task through lightpanda. Returns (prediction, duration_s, timed_out, stderr_tail, returncode)."""
+    """Run a single task through lightpanda.
+
+    Returns (prediction, duration_s, timed_out, stderr_tail, returncode).
+    """
     cmd: list[str] = [str(lightpanda), "agent", "--provider", provider]
     if model:
         cmd += ["--model", model]
@@ -132,3 +139,110 @@ def status_label(result: dict[str, Any]) -> str:
 def mean(xs: Iterable[float]) -> float:
     xs = list(xs)
     return sum(xs) / len(xs) if xs else 0.0
+
+
+def add_common_runner_args(parser: argparse.ArgumentParser, *, suite_name: str) -> None:
+    """Register the flags shared by every benchmark runner. Suite-specific
+    flags (e.g. --level for GAIA) should be added separately by the caller."""
+    parser.add_argument("--split", default="validation", choices=["validation", "test"])
+    parser.add_argument("--limit", type=int, default=None, help="Run at most N tasks")
+    parser.add_argument("--workers", type=int, default=1, help="Parallel lightpanda subprocesses")
+    parser.add_argument("--timeout", type=float, default=300.0, help="Per-task timeout in seconds")
+    parser.add_argument(
+        "--lightpanda",
+        type=Path,
+        default=Path("zig-out/bin/lightpanda"),
+        help=(
+            "Path to the lightpanda binary. If relative, tries CWD then "
+            "<pyproject>/../ (default: zig-out/bin/lightpanda)"
+        ),
+    )
+    parser.add_argument(
+        "--provider", default="gemini", help="Lightpanda agent provider (default: gemini)"
+    )
+    parser.add_argument("--model", default=None, help="Override default model for the provider")
+    parser.add_argument(
+        "--user-agent",
+        default=None,
+        help="Override the browser User-Agent (forwarded to lightpanda --user-agent). "
+        'Cannot contain "Mozilla" per Lightpanda\'s policy.',
+    )
+    parser.add_argument(
+        "--out-dir",
+        type=Path,
+        default=None,
+        help=f"Output dir (default: results/{suite_name}/<timestamp>/)",
+    )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Skip task ids already present in <out-dir>/predictions.jsonl",
+    )
+
+
+def resolve_out_dir(out_dir_arg: Path | None, project_root: Path, suite_name: str) -> Path:
+    """Pick --out-dir if given, otherwise results/<suite>/<UTC-timestamp>/.
+    Creates the directory and returns it."""
+    if out_dir_arg is not None:
+        out_dir = out_dir_arg
+    else:
+        ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        out_dir = project_root / "results" / suite_name / ts
+    out_dir.mkdir(parents=True, exist_ok=True)
+    return out_dir
+
+
+def run_benchmark_tasks(
+    pending: list[dict[str, Any]],
+    work_fn: Callable[[dict[str, Any]], dict[str, Any]],
+    *,
+    predictions_path: Path,
+    workers: int,
+    timeout_s: float,
+    provider: str,
+    model: str | None,
+    preview_fn: Callable[[dict[str, Any]], str] | None = None,
+) -> None:
+    """Execute work_fn over pending rows, appending each result to predictions_path
+    as JSONL and printing a progress line per completion to stderr.
+
+    workers <= 1 runs serially; otherwise a ThreadPoolExecutor drives it.
+    preview_fn(row) returns an optional short task description appended to the line.
+    """
+    total = len(pending)
+    print(
+        f"Running {total} task(s) with {workers} worker(s), "
+        f"timeout {timeout_s:.0f}s, provider={provider}" + (f", model={model}" if model else ""),
+        file=sys.stderr,
+    )
+    print(f"Output dir: {predictions_path.parent}", file=sys.stderr)
+
+    with predictions_path.open("a") as preds:
+
+        def _emit(idx: int, row: dict[str, Any], result: dict[str, Any]) -> None:
+            preds.write(json.dumps(result) + "\n")
+            preds.flush()
+            tail = f" — {preview_fn(row)[:80]}" if preview_fn else ""
+            print(
+                f"[{idx}/{total}] {status_label(result)} "
+                f"{result['duration_s']:.1f}s {result['id'][:12]}{tail}",
+                file=sys.stderr,
+            )
+
+        if workers <= 1:
+            for idx, row in enumerate(pending, 1):
+                _emit(idx, row, work_fn(row))
+        else:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
+                futures = {ex.submit(work_fn, row): row for row in pending}
+                for done, fut in enumerate(concurrent.futures.as_completed(futures), 1):
+                    _emit(done, futures[fut], fut.result())
+
+
+def emit_scores(scores: dict[str, Any], out_dir: Path) -> None:
+    """Write scores.json, print the summary (everything except per_task) to
+    stdout, and print the results path to stderr."""
+    (out_dir / "scores.json").write_text(json.dumps(scores, indent=2))
+    summary = {k: v for k, v in scores.items() if k != "per_task"}
+    print(json.dumps(summary, indent=2))
+    print(f"\nResults: {out_dir}", file=sys.stderr)

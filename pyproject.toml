@@ -36,3 +36,8 @@ target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+# Long lines inside SYSTEM_PROMPT literals aren't worth breaking up.
+"src/agent_benchmarks/assistantbench/run.py" = ["E501"]
+"src/agent_benchmarks/gaia/run.py" = ["E501"]

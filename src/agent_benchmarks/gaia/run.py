@@ -22,23 +22,24 @@ Example:
 from __future__ import annotations
 
 import argparse
-import concurrent.futures
-import json
+import contextlib
 import os
 import sys
 import tempfile
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from datasets import load_dataset  # type: ignore[import-not-found]
 
 from ..common import (
+    add_common_runner_args,
+    emit_scores,
     load_completed_ids,
     print_lightpanda_missing,
     resolve_lightpanda_binary,
+    resolve_out_dir,
+    run_benchmark_tasks,
     run_lightpanda_task,
-    status_label,
 )
 from .grade import grade_predictions
 
@@ -130,13 +131,14 @@ Tool-use rules:
 
 TASK_PROMPT_TEMPLATE = (
     "{task}\n\n"
-    "Output only the exact answer (terse). No explanation, no units beyond what's asked, no markdown."
+    "Output only the exact answer (terse). "
+    "No explanation, no units beyond what's asked, no markdown."
 )
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--split", default="validation", choices=["validation", "test"])
+    add_common_runner_args(parser, suite_name="gaia")
     parser.add_argument(
         "--level",
         type=int,
@@ -152,36 +154,6 @@ def main(argv: list[str] | None = None) -> int:
         "Level-N score is what the GAIA paper reports. Use this flag only when you "
         "want to isolate agent performance on text-only tasks.",
     )
-    parser.add_argument("--limit", type=int, default=None, help="Run at most N tasks")
-    parser.add_argument("--workers", type=int, default=1, help="Parallel lightpanda subprocesses")
-    parser.add_argument("--timeout", type=float, default=300.0, help="Per-task timeout in seconds")
-    parser.add_argument(
-        "--lightpanda",
-        type=Path,
-        default=Path("zig-out/bin/lightpanda"),
-        help="Path to the lightpanda binary. If relative, tries CWD then <pyproject>/../ (default: zig-out/bin/lightpanda)",
-    )
-    parser.add_argument(
-        "--provider", default="gemini", help="Lightpanda agent provider (default: gemini)"
-    )
-    parser.add_argument("--model", default=None, help="Override default model for the provider")
-    parser.add_argument(
-        "--user-agent",
-        default=None,
-        help="Override the browser User-Agent (forwarded to lightpanda --user-agent). "
-        'Cannot contain "Mozilla" per Lightpanda\'s policy.',
-    )
-    parser.add_argument(
-        "--out-dir",
-        type=Path,
-        default=None,
-        help="Output dir (default: results/gaia/<timestamp>/)",
-    )
-    parser.add_argument(
-        "--resume",
-        action="store_true",
-        help="Skip task ids already present in <out-dir>/predictions.jsonl",
-    )
     args = parser.parse_args(argv)
 
     lightpanda = resolve_lightpanda_binary(args.lightpanda, PROJECT_ROOT)
@@ -189,12 +161,7 @@ def main(argv: list[str] | None = None) -> int:
         print_lightpanda_missing(lightpanda)
         return 2
 
-    if args.out_dir is None:
-        ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-        out_dir = PROJECT_ROOT / "results" / "gaia" / ts
-    else:
-        out_dir = args.out_dir
-    out_dir.mkdir(parents=True, exist_ok=True)
+    out_dir = resolve_out_dir(args.out_dir, PROJECT_ROOT, "gaia")
     predictions_path = out_dir / "predictions.jsonl"
 
     completed = load_completed_ids(predictions_path) if args.resume else set()
@@ -234,15 +201,6 @@ def main(argv: list[str] | None = None) -> int:
         rows = rows[: args.limit]
 
     pending = [r for r in rows if r["task_id"] not in completed]
-    print(
-        f"Running {len(pending)} task(s) with {args.workers} worker(s), "
-        f"timeout {args.timeout:.0f}s, provider={args.provider}"
-        + (f", model={args.model}" if args.model else ""),
-        file=sys.stderr,
-    )
-    print(f"Output dir: {out_dir}", file=sys.stderr)
-
-    results_lock_file = predictions_path.open("a")
 
     def _work(row: dict[str, Any]) -> dict[str, Any]:
         attachment: Path | None = None
@@ -274,10 +232,8 @@ def main(argv: list[str] | None = None) -> int:
             )
         finally:
             if tmp_to_delete is not None:
-                try:
+                with contextlib.suppress(OSError):
                     tmp_to_delete.unlink()
-                except OSError:
-                    pass
         return {
             "id": row["task_id"],
             "task": row["Question"],
@@ -291,40 +247,19 @@ def main(argv: list[str] | None = None) -> int:
             "stderr_tail": stderr_tail,
         }
 
-    try:
-        if args.workers <= 1:
-            for idx, row in enumerate(pending, 1):
-                result = _work(row)
-                results_lock_file.write(json.dumps(result) + "\n")
-                results_lock_file.flush()
-                print(
-                    f"[{idx}/{len(pending)}] {status_label(result)} {result['duration_s']:.1f}s {result['id'][:12]} — {row['Question'][:80]}",
-                    file=sys.stderr,
-                )
-        else:
-            with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as ex:
-                futures = {ex.submit(_work, row): row for row in pending}
-                done = 0
-                for fut in concurrent.futures.as_completed(futures):
-                    result = fut.result()
-                    results_lock_file.write(json.dumps(result) + "\n")
-                    results_lock_file.flush()
-                    done += 1
-                    print(
-                        f"[{done}/{len(pending)}] {status_label(result)} {result['duration_s']:.1f}s {result['id'][:12]}",
-                        file=sys.stderr,
-                    )
-    finally:
-        results_lock_file.close()
+    run_benchmark_tasks(
+        pending,
+        _work,
+        predictions_path=predictions_path,
+        workers=args.workers,
+        timeout_s=args.timeout,
+        provider=args.provider,
+        model=args.model,
+        preview_fn=lambda row: row["Question"],
+    )
 
     print("\nGrading...", file=sys.stderr)
-    scores = grade_predictions(predictions_path)
-    scores_path = out_dir / "scores.json"
-    scores_path.write_text(json.dumps(scores, indent=2))
-
-    summary = {k: v for k, v in scores.items() if k != "per_task"}
-    print(json.dumps(summary, indent=2))
-    print(f"\nResults: {out_dir}", file=sys.stderr)
+    emit_scores(grade_predictions(predictions_path), out_dir)
     return 0
 
 
