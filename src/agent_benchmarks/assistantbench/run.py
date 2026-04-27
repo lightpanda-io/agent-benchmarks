@@ -47,7 +47,16 @@ You are a research assistant driving the Lightpanda browser on an open-web QA be
 For each task:
 1. Plan: identify the most authoritative source (official website, known database, or a search engine). Prefer direct sites (IMDB, Wikipedia, shipping carriers, official brand pages) over search engines when you know the source.
 2. Navigate: use goto, tree, markdown, extract, findElement to inspect pages.
-3. Answer terse: output only the answer. For lists, one item per line. For numbers, the bare number (no units, no prose). For URLs, the bare URL.
+3. Final answer format — your entire last message is graded verbatim, character-for-character:
+   - Output ONLY the answer. No preface ("Based on...", "The answer is...", "Here's..."), no explanation, no caveats, no closing remarks, no source citations.
+   - No markdown: no **bold**, no *italics*, no `code`, no bullets, no headings, no asterisks anywhere in the final reply.
+   - Numbers: bare digits only — no units, no `$`, no comma separators, no parenthetical rationale.
+   - Names/titles: complete and verbatim, no decoration.
+   - URLs: bare URL only.
+   - Lists: one item per line, nothing else.
+   - JSON dicts: one JSON object per line, no surrounding prose.
+   - DO: `45` / `Oko, Thief of Crowns` / `https://example.com/foo`
+   - DON'T: `**45**` / `Based on the page, the answer is 45.` / `* 45 (calculated as 4 × $12)` / `The card banned was **Oko, Thief of Crowns**.`
 4. Small-candidate questions ("A, B, or C", yes/no): always pick one — never abstain.
 5. Be decisive. Target ≤10 tool calls per task. If you hit that budget, or a site returns errors, or a tool call repeatedly fails, or you cannot extract the needed info, commit to your best-effort answer from prior knowledge rather than continuing to search. Model knowledge is a valid last resort — preferable to no answer.
 6. Only respond "unknown" if you have exhausted navigation AND prior knowledge gives no lead.
@@ -64,7 +73,8 @@ Tool-use rules:
 
 TASK_PROMPT_TEMPLATE = (
     "{task}\n\n"
-    "Output only the answer (terse). For a list, one item per line. No explanation, no markdown."
+    "Output ONLY the answer — no preface, no explanation, no markdown (no **bold**, no asterisks, "
+    "no bullets). For a list, one item per line. For a number, bare digits only."
 )
 
 
@@ -94,7 +104,7 @@ def main(argv: list[str] | None = None) -> int:
     pending = [r for r in rows if r["id"] not in completed]
 
     def _work(row: dict[str, Any]) -> dict[str, Any]:
-        pred, duration_s, timed_out, stderr_tail, rc = run_lightpanda_task(
+        pred, duration_s, timed_out, stderr_tail, rc, trace = run_lightpanda_task(
             lightpanda=lightpanda,
             provider=args.provider,
             model=args.model,
@@ -112,6 +122,7 @@ def main(argv: list[str] | None = None) -> int:
             "timed_out": timed_out,
             "returncode": rc,
             "difficulty": row.get("difficulty"),
+            "trace": trace,
             "stderr_tail": stderr_tail,
         }
 

@@ -11,6 +11,8 @@ import argparse
 import concurrent.futures
 import json
 import os
+import re
+import shutil
 import subprocess
 import sys
 import time
@@ -20,6 +22,125 @@ from pathlib import Path
 from typing import Any
 
 STDERR_TAIL_BYTES = 8 * 1024
+
+# Cap each Lightpanda subprocess's memory + swap via a systemd-run user-scope
+# cgroup, when systemd-run is available. Lightpanda has a known regression on
+# some JS-heavy pages (GitHub Copilot marketing, etc.) where RSS balloons to
+# 14+ GiB and can OOM the host. A cgroup RSS cap kills a runaway cleanly
+# (cgroup OOM killer, returncode=-9) without touching any sibling processes.
+#
+# Virtual-memory rlimits (RLIMIT_AS) don't work: Lightpanda reserves large
+# virtual regions at init for V8/arenas, so any cap tight enough to catch a
+# runaway also kills healthy processes on startup. cgroup MemoryMax tracks
+# committed RSS + swap, which is what we actually care about.
+#
+# Default cap: 6000 MB (6 GiB). Healthy tasks use <500 MB RSS, so this is
+# ~12x headroom. Tune with LIGHTPANDA_MEMORY_MAX_MB (0 or empty = disable).
+_SYSTEMD_RUN = shutil.which("systemd-run")
+_DEFAULT_MEMORY_MAX_MB = 6000
+
+
+def _memory_max_mb() -> int:
+    raw = os.environ.get("LIGHTPANDA_MEMORY_MAX_MB")
+    if raw is None:
+        return _DEFAULT_MEMORY_MAX_MB
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        return _DEFAULT_MEMORY_MAX_MB
+
+
+def _wrap_with_cgroup_cap(cmd: list[str]) -> list[str]:
+    """Prepend a systemd-run --user --scope wrapper that caps memory + swap.
+    Returns `cmd` unchanged when systemd-run is unavailable or the cap is
+    disabled (env LIGHTPANDA_MEMORY_MAX_MB=0)."""
+    if _SYSTEMD_RUN is None:
+        return cmd
+    mb = _memory_max_mb()
+    if mb <= 0:
+        return cmd
+    return [
+        _SYSTEMD_RUN,
+        "--user",
+        "--scope",
+        "--quiet",
+        "-p",
+        f"MemoryMax={mb}M",
+        "-p",
+        "MemorySwapMax=0",
+        "--",
+        *cmd,
+    ]
+
+
+# ANSI SGR escape sequences (colors, styles) that wrap Terminal.printToolCall
+# output in the Zig agent. Stripped before extracting tool-call lines.
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+
+# The agent logs each tool call and its result as `[tool: <name>] <json_args>`
+# and `[result: <name>] <content>` (Terminal.zig :printToolCall, :printToolResult).
+# Tool-call args are single-line JSON; result bodies can span newlines (markdown
+# dumps, DOM trees). This regex captures either kind and reads body text up to
+# the next marker or end of string.
+#
+# Note: Terminal.printToolResult truncates to 500 chars with a "..." suffix
+# before writing to stderr, so `output` text here is a preview, not the full
+# tool response the agent's LLM received.
+_TOOL_ENTRY_RE = re.compile(
+    r"\[(tool|result): (\S+)\] (.*?)(?=\n\[(?:tool|result): |\Z)",
+    re.DOTALL,
+)
+
+# Tools whose outputs describe what the agent "saw" on a page — i.e. textual
+# substitutes for a screenshot. Order here matters only for documentation; the
+# judge decides which ones are useful.
+PAGE_SNAPSHOT_TOOLS = frozenset(
+    {"markdown", "extract", "tree", "interactiveElements", "structuredData"}
+)
+
+
+def parse_tool_trace(stderr: str) -> list[dict[str, Any]]:
+    """Extract the agent's tool-call timeline from its stderr stream.
+
+    Each entry is `{"tool": <name>, "args": <parsed-json>, "output": <str>?}`.
+    `output` is the tool's result body as printed to stderr — present when the
+    call had a matching `[result: <name>] ...` entry immediately after it in
+    the log. Calls whose args aren't parseable JSON are dropped. Order is
+    preserved so callers can reconstruct the navigation timeline.
+    """
+    stripped = _ANSI_RE.sub("", stderr)
+    items: list[tuple[str, str, str]] = [
+        (m.group(1), m.group(2), m.group(3).strip()) for m in _TOOL_ENTRY_RE.finditer(stripped)
+    ]
+
+    trace: list[dict[str, Any]] = []
+    i = 0
+    while i < len(items):
+        kind, name, body = items[i]
+        if kind != "tool":
+            # A result with no preceding tool call; skip rather than invent a
+            # parent, which would misalign later pairings.
+            i += 1
+            continue
+        try:
+            args = json.loads(body)
+        except json.JSONDecodeError:
+            i += 1
+            continue
+        entry: dict[str, Any] = {"tool": name, "args": args}
+        # Attach an immediately-following result for the same tool. The agent
+        # never interleaves calls with unrelated results, so a name mismatch
+        # means the expected result was lost (e.g. off the stderr tail).
+        if i + 1 < len(items):
+            next_kind, next_name, next_body = items[i + 1]
+            if next_kind == "result" and next_name == name:
+                entry["output"] = next_body
+                i += 2
+                trace.append(entry)
+                continue
+        trace.append(entry)
+        i += 1
+    return trace
 
 
 def run_lightpanda_task(
@@ -32,10 +153,13 @@ def run_lightpanda_task(
     task_prompt: str,
     attachment: Path | None = None,
     timeout_s: float,
-) -> tuple[str, float, bool, str, int | None]:
+) -> tuple[str, float, bool, str, int | None, list[dict[str, Any]]]:
     """Run a single task through lightpanda.
 
-    Returns (prediction, duration_s, timed_out, stderr_tail, returncode).
+    Returns (prediction, duration_s, timed_out, stderr_tail, returncode, trace).
+    `trace` is the parsed tool-call list from the full stderr stream, captured
+    before the tail-truncation step — so it survives long runs where the
+    first tool calls would otherwise roll off the 8 KiB stderr tail.
     """
     cmd: list[str] = [str(lightpanda), "agent", "--provider", provider]
     if model:
@@ -46,6 +170,8 @@ def run_lightpanda_task(
     cmd += ["--task", task_prompt]
     if attachment is not None:
         cmd += ["--task-attachment", str(attachment)]
+
+    cmd = _wrap_with_cgroup_cap(cmd)
 
     env = dict(os.environ)
 
@@ -81,13 +207,17 @@ def run_lightpanda_task(
 
     duration_s = time.monotonic() - started
 
+    # Parse trace from the FULL stderr before we truncate — otherwise long
+    # runs lose their early tool calls along with the head of stderr.
+    trace = parse_tool_trace(stderr)
+
     if len(stderr) > STDERR_TAIL_BYTES:
         stderr_tail = "...[truncated]...\n" + stderr[-STDERR_TAIL_BYTES:]
     else:
         stderr_tail = stderr
 
     prediction = stdout.strip()
-    return prediction, duration_s, timed_out, stderr_tail, returncode
+    return prediction, duration_s, timed_out, stderr_tail, returncode, trace
 
 
 def load_completed_ids(predictions_path: Path) -> set[str]:

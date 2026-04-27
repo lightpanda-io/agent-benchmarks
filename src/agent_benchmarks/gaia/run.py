@@ -114,7 +114,14 @@ You are a research assistant driving the Lightpanda browser on an open-web QA be
 For each task:
 1. Plan: identify the most authoritative source (official website, known database, or a search engine). Prefer direct sites (Wikipedia, shipping carriers, official brand pages) over search engines when you know the source.
 2. Navigate: use goto, tree, markdown, extract, findElement to inspect pages.
-3. Answer with the EXACT value requested — no sentences, no explanation, no units beyond what the question asks for, no surrounding punctuation. For numbers, output the bare number (no comma separators, no currency symbol unless asked). For lists, comma-separated on one line.
+3. Final answer format — your entire last message is graded verbatim, character-for-character:
+   - Output ONLY the exact value requested. No preface ("Based on...", "The answer is...", "Here's..."), no explanation, no caveats, no closing remarks.
+   - No markdown: no **bold**, no *italics*, no `code`, no bullets, no headings, no asterisks anywhere in the final reply.
+   - Numbers: bare digits — no comma separators, no currency unless asked, no units beyond what's asked.
+   - Names/titles: complete and verbatim, no decoration, no surrounding punctuation.
+   - Lists: comma-separated on one line.
+   - DO: `45` / `Oko, Thief of Crowns` / `Paris, London, Tokyo`
+   - DON'T: `**45**` / `The answer is 45.` / `* Paris\n* London\n* Tokyo` / `**Oko, Thief of Crowns**`
 4. Small-candidate questions ("A, B, or C", yes/no): always pick one — never abstain.
 5. If a site returns errors, a tool call repeatedly fails, or you cannot extract the needed info, fall back to your best-effort answer from prior knowledge rather than staying empty. Model knowledge is a valid last resort — preferable to no answer.
 6. Only respond "unknown" if you have exhausted navigation AND prior knowledge gives no lead.
@@ -131,8 +138,8 @@ Tool-use rules:
 
 TASK_PROMPT_TEMPLATE = (
     "{task}\n\n"
-    "Output only the exact answer (terse). "
-    "No explanation, no units beyond what's asked, no markdown."
+    "Output ONLY the exact answer — no preface, no explanation, no markdown (no **bold**, "
+    "no asterisks, no bullets), no units beyond what's asked. Bare digits for numbers."
 )
 
 
@@ -220,7 +227,7 @@ def main(argv: list[str] | None = None) -> int:
                     )
                     attachment = raw
         try:
-            pred, duration_s, timed_out, stderr_tail, rc = run_lightpanda_task(
+            pred, duration_s, timed_out, stderr_tail, rc, trace = run_lightpanda_task(
                 lightpanda=lightpanda,
                 provider=args.provider,
                 model=args.model,
@@ -244,6 +251,7 @@ def main(argv: list[str] | None = None) -> int:
             "returncode": rc,
             "level": row.get("Level"),
             "file_name": file_name or None,
+            "trace": trace,
             "stderr_tail": stderr_tail,
         }
 

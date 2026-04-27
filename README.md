@@ -13,6 +13,13 @@ own runner, grader, and README.
   exact-match rubric. Requires an `HF_TOKEN` (gated dataset). 11 of
   the 53 tasks have attached PDFs/images/audio that Lightpanda can't
   read and will score 0 — matches the published-baseline scope.
+- [`webvoyager`](src/agent_benchmarks/webvoyager/README.md) —
+  [WebVoyager](https://github.com/MinorJerry/WebVoyager) (He et al., ACL 2024),
+  643 live-web tasks across 15 sites, graded by an LLM judge in the shape of
+  Browserbase's [`v3Evaluator`](https://www.browserbase.com/blog/building-verifiers-for-computer-use-agents).
+  Text-only variant — the judge sees the task, the agent's final answer, and
+  the list of URLs it visited (no screenshots). Requires
+  `ANTHROPIC_API_KEY` for the Claude judge.
 
 ## Current results
 
@@ -26,6 +33,7 @@ than reading into a single comparison.
 |---|---|---|---:|---:|---:|---:|---|
 | AssistantBench | `gemini-3-flash-preview` | validation | 33 | 4 | **61.4% ± 6.2 pp** | 69.7% | Paper's GPT-4 baseline ≈ 25% strict |
 | GAIA Level 1 | `gemini-3-flash-preview` | validation | 53 | 4 | **68.4% ± 4.2 pp** | 73.6% | Paper's GPT-4+tools baseline ≈ 30%. Claude 4.5 Sonnet SOTA ≈ 82% |
+| WebVoyager | `gemini-3-flash-preview` | full | 643 | — | *(run pending)* | — | Text-only judge variant: `claude-sonnet-4-5` over task + final answer + visited URLs. Not a canonical WebVoyager leaderboard number (canonical uses screenshots). |
 
 GAIA Level 1 includes all 11 attachment tasks: PNG/MP3/PY/TXT fed via
 `--task-attachment`; DOCX/XLSX/PPTX extracted to text by the runner first.
