@@ -61,6 +61,13 @@ zig build -Doptimize=ReleaseFast
 
 # Set the API key for whichever provider you'll use
 export GOOGLE_API_KEY=...
+
+# Strongly recommended: route the lightpanda `search` tool through Tavily.
+# When unset, search falls back to scraping DuckDuckGo's HTML endpoint —
+# noisier results, may rate-limit under concurrency. Google scraping was
+# tried and dropped because Lightpanda's User-Agent and TLS fingerprint
+# get blocked or fed a consent wall on essentially every query.
+export TAVILY_API_KEY=tvly-...
 ```
 
 ## Running
