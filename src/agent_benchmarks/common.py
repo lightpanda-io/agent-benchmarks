@@ -169,7 +169,7 @@ def run_lightpanda_task(
     cmd += ["--system-prompt", system_prompt]
     cmd += ["--task", task_prompt]
     if attachment is not None:
-        cmd += ["--task-attachment", str(attachment)]
+        cmd += ["--task-attachments", str(attachment)]
 
     cmd = _wrap_with_cgroup_cap(cmd)
 
