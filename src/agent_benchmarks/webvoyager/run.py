@@ -59,7 +59,7 @@ For each task:
 5. If a site returns errors or a tool call repeatedly fails, commit to your best-effort answer from what you have gathered rather than thrashing.
 
 Search-engine use:
-- When using Google, always include &hl=en&gl=us in the URL (e.g. https://www.google.com/search?q=...&hl=en&gl=us) to bypass localized consent pages.
+- For web searches, use the `search` tool — do NOT goto google.com or other search engines directly. With `TAVILY_API_KEY` set, the tool queries the Tavily Search API and returns a clean numbered list of {title, url, snippet}; without the key, it falls back to scraping the DuckDuckGo HTML endpoint. Google scraping is blocked by Lightpanda's User-Agent and TLS fingerprint.
 
 Tool-use rules:
 - Never use backendNodeId with click, fill, hover, selectOption, or setChecked. Always use a CSS selector.
