@@ -20,6 +20,13 @@ own runner, grader, and README.
   Text-only variant — the judge sees the task, the agent's final answer, and
   the list of URLs it visited (no screenshots). Requires
   `ANTHROPIC_API_KEY` for the Claude judge.
+- [`webbench`](src/agent_benchmarks/webbench/README.md) —
+  [WebBench](https://github.com/Halluminate/WebBench) (Halluminate × Skyvern),
+  READ subset only (1,637 tasks across 448 sites). Same text-only LLM-judge
+  shape as WebVoyager, sharing the
+  [`llm_judge`](src/agent_benchmarks/llm_judge.py) module. CREATE/UPDATE/
+  DELETE/FILE_MANIPULATION categories are out of scope (need real account
+  auth on every site, side effects unverifiable from text snapshots).
 
 ## Current results
 
@@ -34,6 +41,7 @@ than reading into a single comparison.
 | AssistantBench | `gemini-3-flash-preview` | validation | 33 | 4 | **61.4% ± 6.2 pp** | 69.7% | Paper's GPT-4 baseline ≈ 25% strict |
 | GAIA Level 1 | `gemini-3-flash-preview` | validation | 53 | 4 | **68.4% ± 4.2 pp** | 73.6% | Paper's GPT-4+tools baseline ≈ 30%. Claude 4.5 Sonnet SOTA ≈ 82% |
 | WebVoyager | `gemini-3-flash-preview` | full | 643 | — | *(run pending)* | — | Text-only judge variant: `claude-sonnet-4-5` over task + final answer + visited URLs. Not a canonical WebVoyager leaderboard number (canonical uses screenshots). |
+| WebBench (READ) | `gemini-3-flash-preview` | READ subset | 1637 | — | *(run pending)* | — | Text-only LLM judge, same shape as WebVoyager. READ-only subset: write-style categories need site-specific auth and have unverifiable side effects. |
 
 GAIA Level 1 includes all 11 attachment tasks: PNG/MP3/PY/TXT fed via
 `--task-attachment`; DOCX/XLSX/PPTX extracted to text by the runner first.
