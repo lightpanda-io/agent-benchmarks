@@ -10,7 +10,7 @@ dependencies = [
     "python-docx>=1.1",
     "openpyxl>=3.1",
     "python-pptx>=0.6.23",
-    # LLM-judge backends for the WebVoyager grader. The judge dispatches
+    # LLM-judge backends for the WebBench grader. The judge dispatches
     # on the --judge-model prefix: claude-* → anthropic, gemini-* → google.
     "anthropic>=0.40",
     "google-genai>=1.0",
@@ -21,8 +21,6 @@ assistantbench-run = "agent_benchmarks.assistantbench.run:main"
 assistantbench-grade = "agent_benchmarks.assistantbench.grade:main"
 gaia-run = "agent_benchmarks.gaia.run:main"
 gaia-grade = "agent_benchmarks.gaia.grade:main"
-webvoyager-run = "agent_benchmarks.webvoyager.run:main"
-webvoyager-grade = "agent_benchmarks.webvoyager.grade:main"
 webbench-run = "agent_benchmarks.webbench.run:main"
 webbench-grade = "agent_benchmarks.webbench.grade:main"
 
@@ -34,11 +32,9 @@ build-backend = "hatchling.build"
 packages = ["src/agent_benchmarks"]
 
 [tool.hatch.build]
-# The webvoyager and webbench suites ship vendored copies of their upstream
-# datasets so the runners have no network dependency.
+# WebBench ships a vendored copy of its upstream dataset so the runner
+# has no network dependency.
 include = [
-    "src/agent_benchmarks/webvoyager/data/*.jsonl",
-    "src/agent_benchmarks/webvoyager/data/*.json",
     "src/agent_benchmarks/webbench/data/*.jsonl",
 ]
 
@@ -58,7 +54,5 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 # Long lines inside SYSTEM_PROMPT literals aren't worth breaking up.
 "src/agent_benchmarks/assistantbench/run.py" = ["E501"]
 "src/agent_benchmarks/gaia/run.py" = ["E501"]
-"src/agent_benchmarks/webvoyager/run.py" = ["E501"]
-"src/agent_benchmarks/webvoyager/grade.py" = ["E501"]
 "src/agent_benchmarks/webbench/run.py" = ["E501"]
 "src/agent_benchmarks/llm_judge.py" = ["E501"]

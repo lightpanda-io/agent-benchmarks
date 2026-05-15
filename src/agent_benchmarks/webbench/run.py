@@ -10,10 +10,10 @@ to a timestamped results directory. Grading defers to
 `agent_benchmarks.llm_judge` with `variant="webbench-text-only"`.
 
 WebBench has no reference answers in the dataset; the upstream protocol is
-human-in-the-loop. We run the same text-only LLM-judge approach as
-WebVoyager — comparable across Lightpanda runs with the same judge_model
-and variant, but **not** a canonical WebBench leaderboard number (canonical
-uses HITL or a multimodal judge over screenshots).
+human-in-the-loop. We run a text-only LLM-judge approach — comparable
+across Lightpanda runs with the same judge_model and variant, but **not**
+a canonical WebBench leaderboard number (canonical uses HITL or a
+multimodal judge over screenshots).
 
 Example:
 
@@ -49,9 +49,9 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 DATA_DIR = Path(__file__).parent / "data"
 TASKS_PATH = DATA_DIR / "webbench_read.jsonl"
 
-# Same shape as WebVoyager: short, grounded natural-language answers. The
-# WebBench task strings already include the "only use http://X.com" constraint,
-# so we don't need to repeat it here.
+# Short, grounded natural-language answers. The WebBench task strings
+# already include the "only use http://X.com" constraint, so we don't
+# need to repeat it here.
 SYSTEM_PROMPT = """\
 You are a web navigation assistant driving the Lightpanda browser on a live-web benchmark.
 

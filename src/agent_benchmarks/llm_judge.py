@@ -1,17 +1,16 @@
 """Shared LLM-judge grader for text-only browser-agent benchmarks.
 
-Originally extracted from `webvoyager/grade.py`. Both `webvoyager` and
-`webbench` consume this — the prediction envelope they emit shares the
-same shape (`id`, `web_name`, `task`, `start_url`, `prediction`, `trace`,
-optional `reference`), so a single judge implementation works for both.
+The prediction envelope expected by this module is `id`, `web_name`,
+`task`, `start_url`, `prediction`, `trace`, optional `reference` — the
+shape WebBench (and historically WebVoyager) emits.
 
 The judge dispatches on model prefix: `claude-*` → Anthropic, `gemini-*` →
 Google. Default is `claude-sonnet-4-5` because the v3Evaluator-shaped
 rubric is well-tuned for Claude, and because the agent under test
 typically runs on Gemini — different families avoid same-family self-eval.
 
-Callers parameterize `variant` (e.g. `"text-only"`, `"webbench-text-only"`)
-so the resulting `scores.json` records which protocol it was run under.
+Callers parameterize `variant` (e.g. `"webbench-text-only"`) so the
+resulting `scores.json` records which protocol it was run under.
 Comparability requires both `judge_model` and `variant` to match.
 """
 
@@ -253,8 +252,7 @@ def grade_predictions(
 ) -> dict[str, Any]:
     """Grade a predictions.jsonl with the LLM judge and return the scores
     dict. `variant` is recorded in the result so callers can distinguish
-    suite-specific protocols (e.g. webvoyager's `text-only` vs webbench's
-    `webbench-text-only`)."""
+    suite-specific protocols (e.g. webbench's `webbench-text-only`)."""
     provider = _judge_provider_for(judge_model)
     client = _make_judge_client(provider)
 

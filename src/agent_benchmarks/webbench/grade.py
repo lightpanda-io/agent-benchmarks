@@ -1,12 +1,10 @@
 """WebBench LLM-judge CLI.
 
-Thin wrapper over `agent_benchmarks.llm_judge`, mirroring `webvoyager/grade.py`.
-The judge core (prompt, provider dispatch, scoring, per-site breakdown) lives
-in `llm_judge.py` and is shared with the WebVoyager suite.
+Thin wrapper over `agent_benchmarks.llm_judge`. The judge core (prompt,
+provider dispatch, scoring, per-site breakdown) lives in `llm_judge.py`.
 
-Variant pinned to `"webbench-text-only"` so WebBench scores.json files are
-not silently mixed with WebVoyager runs (different task sets, different
-domains, different difficulty distribution).
+Variant pinned to `"webbench-text-only"` so WebBench scores.json files
+record the protocol they were graded under.
 """
 
 from __future__ import annotations

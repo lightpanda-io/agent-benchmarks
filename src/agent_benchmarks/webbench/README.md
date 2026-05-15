@@ -4,7 +4,7 @@ Drives the Lightpanda agent against the READ subset of
 [WebBench](https://github.com/Halluminate/WebBench) (Halluminate × Skyvern,
 2,454 open-sourced tasks across 452 live websites — an explicit successor to
 WebVoyager that scales sites 15→452 and tasks 642→5,750). Tasks are graded by
-the same LLM-judge as WebVoyager; the judge implementation lives in the shared
+a text-only LLM judge; the judge implementation lives in the shared
 [`agent_benchmarks.llm_judge`](../llm_judge.py) module.
 
 ## Variant: text-only, READ subset only
@@ -19,16 +19,15 @@ subset** (1,637 tasks across 448 sites), for two reasons:
    can't verify from text snapshots — it could only check whether the agent
    *claimed* to perform the action.
 
-Even within READ, "text-only" rests on **analogy with the existing WebVoyager
-pipeline** rather than a guarantee — `Category=READ` describes the data
-action, not the modality. A small minority of READ tasks bake in
-interactions a text browser can't do (e.g. "play the audio sample" on
-dictionary.com); these will simply count as failures.
+Even within READ, "text-only" is a modality assumption, not a
+guarantee — `Category=READ` describes the data action. A small minority
+of READ tasks bake in interactions a text browser can't do (e.g. "play
+the audio sample" on dictionary.com); these will simply count as
+failures.
 
 The judge sees the task, the agent's final natural-language answer, the
-ordered list of URLs visited, and **text snapshots** (truncated outputs of
-the `markdown` / `tree` / `extract` / `interactiveElements` tools). Same
-shape as the WebVoyager text-only variant.
+ordered list of URLs visited, and **text snapshots** (truncated outputs
+of the `markdown` / `tree` / `extract` / `interactiveElements` tools).
 
 Implications:
 
