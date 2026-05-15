@@ -1,28 +1,31 @@
 """
-WebVoyager runner for the Lightpanda agent.
+WebBench runner for the Lightpanda agent.
 
-Loads the 643-task WebVoyager dataset (vendored under `data/`), invokes the
-Lightpanda agent one-shot per row with a navigation-oriented system prompt,
-and writes predictions + trace (parsed tool calls from the agent's stderr) to
-a timestamped results directory. Grading is done separately by
-`webvoyager-grade`, which calls an LLM judge over the task + agent answer +
-visited URLs.
+Loads the vendored READ subset of [WebBench](https://huggingface.co/datasets/Halluminate/WebBench)
+(1,637 tasks across ~448 sites — the data-extraction half of the 2,454-task
+benchmark; CREATE/UPDATE/DELETE/FILE_MANIPULATION are out of scope for a
+text-only browser, see README.md), invokes the Lightpanda agent one-shot per
+row with a navigation-oriented system prompt, and writes predictions + trace
+to a timestamped results directory. Grading defers to
+`agent_benchmarks.llm_judge` with `variant="webbench-text-only"`.
 
-Unlike GAIA/AssistantBench, WebVoyager has no token-F1 / exact-match gold —
-the whole point is that the canonical protocol uses an LLM judge. Reference
-answers are loaded as hints and persisted alongside the prediction; the
-grader decides how to use them.
+WebBench has no reference answers in the dataset; the upstream protocol is
+human-in-the-loop. We run a text-only LLM-judge approach — comparable
+across Lightpanda runs with the same judge_model and variant, but **not**
+a canonical WebBench leaderboard number (canonical uses HITL or a
+multimodal judge over screenshots).
 
 Example:
 
-    uv run webvoyager-run --limit 3
-    uv run webvoyager-run --site Allrecipes --workers 4
+    uv run webbench-run --limit 3
+    uv run webbench-run --site allrecipes.com --workers 4
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import random
 import sys
 from pathlib import Path
 from typing import Any
@@ -36,18 +39,19 @@ from ..common import (
     resolve_out_dir,
     run_benchmark_tasks,
     run_lightpanda_task,
+    write_run_manifest,
 )
-from .grade import grade_predictions
+from ..llm_judge import grade_predictions
+from .grade import VARIANT
 
-# benchmarks/src/agent_benchmarks/webvoyager/run.py → benchmarks/
+# benchmarks/src/agent_benchmarks/webbench/run.py → benchmarks/
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 DATA_DIR = Path(__file__).parent / "data"
-TASKS_PATH = DATA_DIR / "WebVoyager_data.jsonl"
-REFERENCE_PATH = DATA_DIR / "reference_answer.json"
+TASKS_PATH = DATA_DIR / "webbench_read.jsonl"
 
-# WebVoyager expects a short natural-language answer summarizing what the
-# agent found, not a terse exact-match string. The judge reads this plus the
-# visited URLs to decide if the task was accomplished.
+# Short, grounded natural-language answers. The WebBench task strings
+# already include the "only use http://X.com" constraint, so we don't
+# need to repeat it here.
 SYSTEM_PROMPT = """\
 You are a web navigation assistant driving the Lightpanda browser on a live-web benchmark.
 
@@ -55,11 +59,12 @@ For each task:
 1. Start at the URL given in the task. Navigate from there.
 2. Use goto, tree, interactiveElements, markdown, extract, findElement to inspect pages and locate information.
 3. Answer with a specific, grounded, 1-2 sentence natural-language response that directly addresses the task. Include concrete details (names, numbers, prices, dates, URLs) that you actually saw on the pages you visited.
-4. Avoid generic or hedged answers ("I couldn't find...", "it appears that..."). If a site blocks you or the information isn't available, say so plainly and explain what you tried.
+4. Avoid generic or hedged answers ("I couldn't find...", "it appears that..."). If a site blocks you (cookie wall, 403, access-denied, empty page), say so plainly with a literal description of what you saw, and do NOT fabricate an answer from prior knowledge — an honest "the site blocked access" beats a guessed answer.
 5. If a site returns errors or a tool call repeatedly fails, commit to your best-effort answer from what you have gathered rather than thrashing.
 
-Search-engine use:
-- For web searches, use the `search` tool — do NOT goto google.com or other search engines directly. With `TAVILY_API_KEY` set, the tool queries the Tavily Search API and returns a clean numbered list of {title, url, snippet}; without the key, it falls back to scraping the DuckDuckGo HTML endpoint. Google scraping is blocked by Lightpanda's User-Agent and TLS fingerprint.
+Domain constraint:
+- WebBench tasks specify a single domain ("Only use http://X.com — don't go to any other site"). Do NOT use the `search` tool and do NOT goto google.com or any search engine. Stay on the constrained domain throughout the task.
+- If you cannot find the information by navigating within the domain, answer with a literal description of what you saw rather than fabricating from off-domain sources.
 
 Tool-use rules:
 - Never use backendNodeId with click, fill, hover, selectOption, or setChecked. Always use a CSS selector.
@@ -86,34 +91,27 @@ def _load_tasks() -> list[dict[str, Any]]:
     return tasks
 
 
-def _load_reference_map() -> dict[str, str]:
-    """Flatten reference_answer.json into a `{task_id: ref_ans_str}` map.
-
-    Upstream `reference_answer.json` is `{web_name: {notice, answers: [{id,
-    type, ans}]}}` where `id` is the int suffix of the task id (e.g. `0` in
-    `Allrecipes--0`). Some tasks have multiple possible answers — we join
-    them with " / " so the judge sees the full set of acceptable outcomes.
-    """
-    if not REFERENCE_PATH.exists():
-        return {}
-    raw = json.loads(REFERENCE_PATH.read_text())
-    out: dict[str, str] = {}
-    for web_name, entry in raw.items():
-        for ans in entry.get("answers", []):
-            task_id = f"{web_name}--{ans['id']}"
-            text = ans.get("ans")
-            if text:
-                out[task_id] = out[task_id] + " / " + str(text) if task_id in out else str(text)
-    return out
-
-
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    add_common_runner_args(parser, suite_name="webvoyager")
+    add_common_runner_args(parser, suite_name="webbench")
     parser.add_argument(
         "--site",
         default=None,
-        help="Filter to a single site (e.g. 'Allrecipes', 'GitHub'). Matches web_name exactly.",
+        help="Filter to a single site (e.g. 'allrecipes.com', 'github.com'). "
+        "Matches web_name (URL host, lowercased, www. stripped) exactly.",
+    )
+    parser.add_argument(
+        "--sample-per-site",
+        type=int,
+        default=None,
+        help="Randomly sample at most N task(s) per site. Useful for broad-coverage runs "
+        "in a fixed wall-clock budget (e.g. --sample-per-site 1 → ~448 tasks).",
+    )
+    parser.add_argument(
+        "--sample-seed",
+        type=int,
+        default=0,
+        help="Seed for --sample-per-site (default: 0, reproducible).",
     )
     parser.add_argument(
         "--no-grade",
@@ -132,15 +130,15 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: missing vendored dataset at {TASKS_PATH}", file=sys.stderr)
         return 2
 
-    out_dir = resolve_out_dir(args.out_dir, PROJECT_ROOT, "webvoyager")
+    out_dir = resolve_out_dir(args.out_dir, PROJECT_ROOT, "webbench")
     predictions_path = out_dir / "predictions.jsonl"
+    write_run_manifest(out_dir, agent_provider=args.provider, agent_model=args.model)
 
     completed = load_completed_ids(predictions_path) if args.resume else set()
     if completed:
         print(f"Resuming — skipping {len(completed)} already-completed task(s)", file=sys.stderr)
 
     rows = _load_tasks()
-    reference_map = _load_reference_map()
 
     if args.site:
         before = len(rows)
@@ -156,6 +154,23 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"  {s}", file=sys.stderr)
             return 2
 
+    if args.sample_per_site is not None:
+        rng = random.Random(args.sample_seed)
+        by_site: dict[str, list[dict[str, Any]]] = {}
+        for r in rows:
+            by_site.setdefault(r["web_name"], []).append(r)
+        sampled: list[dict[str, Any]] = []
+        for _, group in sorted(by_site.items()):
+            rng.shuffle(group)
+            sampled.extend(group[: args.sample_per_site])
+        before = len(rows)
+        rows = sampled
+        print(
+            f"Per-site sample (n={args.sample_per_site}, seed={args.sample_seed}): "
+            f"{before} → {len(rows)} task(s) across {len(by_site)} site(s)",
+            file=sys.stderr,
+        )
+
     if args.limit is not None:
         rows = rows[: args.limit]
 
@@ -168,15 +183,16 @@ def main(argv: list[str] | None = None) -> int:
             model=args.model,
             user_agent=args.user_agent,
             system_prompt=SYSTEM_PROMPT,
-            task_prompt=TASK_PROMPT_TEMPLATE.format(start_url=row["web"], task=row["ques"]),
+            task_prompt=TASK_PROMPT_TEMPLATE.format(start_url=row["start_url"], task=row["task"]),
             timeout_s=args.timeout,
         )
         return {
             "id": row["id"],
             "web_name": row["web_name"],
-            "task": row["ques"],
-            "start_url": row["web"],
-            "reference": reference_map.get(row["id"]),
+            "category": row["category"],
+            "task": row["task"],
+            "start_url": row["start_url"],
+            "reference": None,
             "prediction": pred,
             "duration_s": round(duration_s, 2),
             "timed_out": timed_out,
@@ -193,7 +209,7 @@ def main(argv: list[str] | None = None) -> int:
         timeout_s=args.timeout,
         provider=args.provider,
         model=args.model,
-        preview_fn=lambda row: f"[{row['web_name']}] {row['ques']}",
+        preview_fn=lambda row: f"[{row['web_name']}] {row['task'].splitlines()[0]}",
     )
 
     if args.no_grade:
@@ -201,7 +217,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     print("\nGrading with LLM judge...", file=sys.stderr)
-    emit_scores(grade_predictions(predictions_path), out_dir)
+    emit_scores(grade_predictions(predictions_path, variant=VARIANT), out_dir)
     return 0
 
 

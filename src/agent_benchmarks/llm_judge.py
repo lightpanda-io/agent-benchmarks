@@ -1,25 +1,21 @@
-"""
-WebVoyager LLM-judge grader.
+"""Shared LLM-judge grader for text-only browser-agent benchmarks.
 
-Inspired by Browserbase's `v3Evaluator` (Stagehand) and WebVoyager's own
-`auto_eval.py`. This is a text-only variant — the canonical WebVoyager judge
-reads the last N screenshots; Lightpanda is a text-only browser, so the judge
-sees the task, the agent's final answer, and the ANSI-stripped list of URLs
-the agent visited (parsed out of stderr by `common.parse_tool_trace`).
+The prediction envelope expected by this module is `id`, `web_name`,
+`task`, `start_url`, `prediction`, `trace`, optional `reference` — the
+shape WebBench (and historically WebVoyager) emits.
 
-Default judge is `claude-sonnet-4-5` for cross-provider independence (the
-agent typically runs on Gemini). Swap with `--judge-model`.
+The judge dispatches on model prefix: `claude-*` → Anthropic, `gemini-*` →
+Google. Default is `claude-sonnet-4-5` because the v3Evaluator-shaped
+rubric is well-tuned for Claude, and because the agent under test
+typically runs on Gemini — different families avoid same-family self-eval.
 
-Results include:
-  - verdict: YES | NO | INVALID per task
-  - accuracy: fraction of YES verdicts
-  - by_site: per-site breakdown
-  - judge_model, variant: encoded so only like-for-like runs are comparable
+Callers parameterize `variant` (e.g. `"webbench-text-only"`) so the
+resulting `scores.json` records which protocol it was run under.
+Comparability requires both `judge_model` and `variant` to match.
 """
 
 from __future__ import annotations
 
-import argparse
 import concurrent.futures
 import json
 import os
@@ -27,14 +23,9 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from ..common import PAGE_SNAPSHOT_TOOLS, mean
+from .common import PAGE_SNAPSHOT_TOOLS, mean, read_run_manifest
 
-# We pin the judge provider to Anthropic for the default because the
-# v3Evaluator-shaped rubric is well-tuned against Claude, and because the
-# agent-under-test (Lightpanda) most often runs on Gemini — using Claude
-# avoids same-family self-evaluation. Override via --judge-model.
 DEFAULT_JUDGE_MODEL = "claude-sonnet-4-5"
-VARIANT = "text-only"
 
 # How many "text snapshots" of what the agent saw to show the judge. Each
 # snapshot is a single page-reading tool output (markdown / tree / extract /
@@ -42,8 +33,8 @@ VARIANT = "text-only"
 # chars, so these are excerpts rather than full page contents — the judge
 # should treat them as evidence, not as authoritative. Five snapshots keeps
 # the prompt under ~4 KB including overhead.
-N_SNAPSHOTS_TO_SHOW = 5
-SNAPSHOT_MAX_CHARS = 900
+N_SNAPSHOTS_TO_SHOW = 8
+SNAPSHOT_MAX_CHARS = 2000
 
 JUDGE_SYSTEM_PROMPT = """\
 You are an expert evaluator judging whether a browser agent successfully completed a web-navigation task. Lightpanda is a text-only browser (no rendering), so instead of screenshots you are shown excerpts of what the agent's page-reading tools actually returned — these are textual substitutes for screenshots.
@@ -91,7 +82,6 @@ def _summarize_args(tool: str, args: Any) -> str:
     if tool == "tree":
         depth = args.get("maxDepth")
         return f"maxDepth={depth}" if depth is not None else ""
-    # markdown / interactiveElements / structuredData: args are usually empty
     return json.dumps(args) if args else ""
 
 
@@ -106,9 +96,8 @@ def _format_prompt(pred: dict[str, Any]) -> str:
     urls = [u for u in urls if u]
     urls_block = "\n".join(f"  - {u}" for u in urls) if urls else "  (no goto tool calls recorded)"
 
-    # Which goto each snapshot followed tells the judge which *page* it is a
-    # snapshot of. We walk the trace once, tracking the last-seen URL, and
-    # tag snapshots with it.
+    # Tag each snapshot with the URL the agent was on when it took the
+    # snapshot, by walking the trace and tracking the last-seen goto URL.
     snapshots: list[tuple[str, str, str, str]] = []  # (tool, label, url, output)
     current_url = pred.get("start_url") or ""
     for entry in trace:
@@ -123,8 +112,6 @@ def _format_prompt(pred: dict[str, Any]) -> str:
             label = _summarize_args(tool, entry.get("args"))
             snapshots.append((tool, label, current_url, output))
 
-    # Keep the last N — these are the pages the agent saw just before
-    # committing to its answer, which is where grounding lives.
     snapshots = snapshots[-N_SNAPSHOTS_TO_SHOW:]
     if snapshots:
         snapshot_sections = []
@@ -179,8 +166,6 @@ def _parse_judge_response(text: str) -> tuple[str, str]:
 
 
 def _judge_provider_for(model: str) -> str:
-    """Dispatch table from model name to judge backend. Keep this list in sync
-    with the SDKs declared in pyproject.toml."""
     if model.startswith("claude-"):
         return "anthropic"
     if model.startswith(("gemini-", "models/gemini-")):
@@ -193,8 +178,6 @@ def _judge_provider_for(model: str) -> str:
 
 
 def _make_judge_client(provider: str) -> Any:
-    """Construct the SDK client for `provider`. Imports are done lazily so
-    that missing an optional SDK doesn't break the other providers."""
     if provider == "anthropic":
         if not os.environ.get("ANTHROPIC_API_KEY"):
             raise RuntimeError("ANTHROPIC_API_KEY is not set for claude-* judge.")
@@ -211,8 +194,6 @@ def _make_judge_client(provider: str) -> Any:
 
 
 def _call_judge(provider: str, client: Any, model: str, system: str, user_prompt: str) -> str:
-    """Call the judge and return its raw reply text. Max-tokens is kept
-    modest (256) because the judge reply is just `VERDICT: X\\nREASONING: ...`."""
     if provider == "anthropic":
         resp = client.messages.create(
             model=model,
@@ -225,9 +206,8 @@ def _call_judge(provider: str, client: Any, model: str, system: str, user_prompt
         )
     if provider == "gemini":
         # google-genai exposes system instructions via GenerateContentConfig.
-        # We pin a small thinking budget: the Gemini 3.x Pro line is a
-        # thinking model, and an unbounded budget can stall on a quick
-        # verdict while the model self-deliberates.
+        # Pin a small thinking budget: Gemini 3.x Pro can stall on a quick
+        # verdict when an unbounded budget lets it self-deliberate.
         from google.genai import types  # type: ignore[import-not-found]
 
         resp = client.models.generate_content(
@@ -268,7 +248,11 @@ def grade_predictions(
     *,
     judge_model: str = DEFAULT_JUDGE_MODEL,
     workers: int = 4,
+    variant: str = "text-only",
 ) -> dict[str, Any]:
+    """Grade a predictions.jsonl with the LLM judge and return the scores
+    dict. `variant` is recorded in the result so callers can distinguish
+    suite-specific protocols (e.g. webbench's `webbench-text-only`)."""
     provider = _judge_provider_for(judge_model)
     client = _make_judge_client(provider)
 
@@ -331,6 +315,7 @@ def grade_predictions(
         )
 
     return {
+        **read_run_manifest(predictions_path),
         "n_tasks": n,
         "n_answered": answered,
         "timeouts": timeouts,
@@ -340,7 +325,7 @@ def grade_predictions(
         "invalid": invalid,
         "judge_model": judge_model,
         "judge_provider": provider,
-        "variant": VARIANT,
+        "variant": variant,
         "by_site": {
             site: {
                 "n": len(vs),
@@ -354,44 +339,3 @@ def grade_predictions(
         "avg_duration_s": mean(durations),
         "per_task": per_task,
     }
-
-
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("predictions", type=Path, help="Path to predictions.jsonl")
-    parser.add_argument(
-        "--judge-model",
-        default=DEFAULT_JUDGE_MODEL,
-        help=(
-            f"Model to use as the judge (default: {DEFAULT_JUDGE_MODEL}). "
-            "Supported prefixes: claude-* (Anthropic), gemini-* (Google)."
-        ),
-    )
-    parser.add_argument(
-        "--judge-workers",
-        type=int,
-        default=4,
-        help="Parallel judge calls (default: 4)",
-    )
-    parser.add_argument(
-        "--out",
-        type=Path,
-        default=None,
-        help="Write scores JSON here (default: predictions sibling scores.json)",
-    )
-    args = parser.parse_args(argv)
-
-    result = grade_predictions(
-        args.predictions, judge_model=args.judge_model, workers=args.judge_workers
-    )
-    out_path = args.out or args.predictions.parent / "scores.json"
-    out_path.write_text(json.dumps(result, indent=2))
-
-    summary = {k: v for k, v in result.items() if k != "per_task"}
-    print(json.dumps(summary, indent=2))
-    print(f"\nFull report written to: {out_path}")
-    return 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())

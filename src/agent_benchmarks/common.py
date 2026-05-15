@@ -376,3 +376,28 @@ def emit_scores(scores: dict[str, Any], out_dir: Path) -> None:
     summary = {k: v for k, v in scores.items() if k != "per_task"}
     print(json.dumps(summary, indent=2))
     print(f"\nResults: {out_dir}", file=sys.stderr)
+
+
+# Run provenance: stamped next to predictions.jsonl at run start so that
+# standalone re-grading (e.g. `webbench-grade <predictions> --judge-model X`)
+# can carry the agent provider/model into scores.json without re-deriving
+# it from CLI args. agent_model=None means the provider's baked-in default
+# was used. `argv` is the full launch line — the canonical "how to
+# reproduce this run" record (resume the same out-dir + same flags).
+def write_run_manifest(out_dir: Path, *, agent_provider: str, agent_model: str | None) -> None:
+    manifest = {
+        "agent_provider": agent_provider,
+        "agent_model": agent_model,
+        "argv": sys.argv,
+        "started_at": datetime.now(timezone.utc).isoformat(),
+    }
+    (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2))
+
+
+def read_run_manifest(predictions_path: Path) -> dict[str, Any]:
+    """Empty dict for runs that predate manifest stamping or for hand-curated
+    predictions files — graders should always merge defensively."""
+    p = predictions_path.parent / "manifest.json"
+    if not p.exists():
+        return {}
+    return json.loads(p.read_text())
