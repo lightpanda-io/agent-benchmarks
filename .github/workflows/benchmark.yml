@@ -1,0 +1,103 @@
+name: benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      suite:
+        type: choice
+        description: Which benchmark suite to run
+        options:
+          - assistantbench
+          - gaia
+          - webvoyager
+        default: assistantbench
+      limit:
+        type: string
+        description: Run at most N tasks (empty = full split)
+        default: "3"
+      workers:
+        type: string
+        description: Parallel lightpanda subprocesses
+        default: "1"
+      provider:
+        type: string
+        description: Lightpanda agent provider (gemini / anthropic / openai)
+        default: gemini
+      model:
+        type: string
+        description: Override default model for the provider (empty = suite default)
+        default: ""
+      timeout:
+        type: string
+        description: Per-task timeout in seconds
+        default: "300"
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    env:
+      LIGHTPANDA_BIN: /opt/lightpanda/lightpanda
+      OUT_DIR: results/${{ inputs.suite }}/ci
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Sync Python deps
+        run: uv sync --frozen
+
+      - name: Download lightpanda agent-nightly binary
+        run: |
+          sudo mkdir -p /opt/lightpanda
+          sudo curl -fsSL -o "$LIGHTPANDA_BIN" \
+            https://get.agent-nightly.lightpanda.io/lightpanda-agent-x86_64-linux
+          sudo chmod +x "$LIGHTPANDA_BIN"
+          "$LIGHTPANDA_BIN" --version || true
+
+      - name: Run ${{ inputs.suite }}
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          LIGHTPANDA_MEMORY_MAX_MB: "0"
+          PYTHONUNBUFFERED: "1"
+        run: |
+          set -euo pipefail
+          args=(
+            --lightpanda "$LIGHTPANDA_BIN"
+            --workers "${{ inputs.workers }}"
+            --timeout "${{ inputs.timeout }}"
+            --provider "${{ inputs.provider }}"
+            --out-dir "$OUT_DIR"
+          )
+          if [ -n "${{ inputs.limit }}" ]; then
+            args+=(--limit "${{ inputs.limit }}")
+          fi
+          if [ -n "${{ inputs.model }}" ]; then
+            args+=(--model "${{ inputs.model }}")
+          fi
+          uv run "${{ inputs.suite }}-run" "${args[@]}"
+
+      - name: Grade ${{ inputs.suite }}
+        if: always()
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+        run: |
+          if [ -s "$OUT_DIR/predictions.jsonl" ]; then
+            uv run "${{ inputs.suite }}-grade" "$OUT_DIR/predictions.jsonl"
+          else
+            echo "no predictions to grade (run failed before writing any)" >&2
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ${{ inputs.suite }}-${{ github.run_id }}
+          path: ${{ env.OUT_DIR }}
+          if-no-files-found: warn
