@@ -24,7 +24,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from .common import PAGE_SNAPSHOT_TOOLS, mean
+from .common import PAGE_SNAPSHOT_TOOLS, mean, read_run_manifest
 
 DEFAULT_JUDGE_MODEL = "claude-sonnet-4-5"
 
@@ -317,6 +317,7 @@ def grade_predictions(
         )
 
     return {
+        **read_run_manifest(predictions_path),
         "n_tasks": n,
         "n_answered": answered,
         "timeouts": timeouts,

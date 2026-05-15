@@ -39,6 +39,7 @@ from ..common import (
     resolve_out_dir,
     run_benchmark_tasks,
     run_lightpanda_task,
+    write_run_manifest,
 )
 from ..llm_judge import grade_predictions
 from .grade import VARIANT
@@ -131,6 +132,7 @@ def main(argv: list[str] | None = None) -> int:
 
     out_dir = resolve_out_dir(args.out_dir, PROJECT_ROOT, "webbench")
     predictions_path = out_dir / "predictions.jsonl"
+    write_run_manifest(out_dir, agent_provider=args.provider, agent_model=args.model)
 
     completed = load_completed_ids(predictions_path) if args.resume else set()
     if completed:

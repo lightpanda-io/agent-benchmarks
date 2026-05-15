@@ -31,7 +31,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from ..common import mean
+from ..common import mean, read_run_manifest
 
 _ARTICLES = {"a", "an", "the"}
 _PUNCT_TABLE = str.maketrans("", "", string.punctuation)
@@ -185,6 +185,7 @@ def grade_predictions(predictions_path: Path) -> dict[str, Any]:
         )
 
     return {
+        **read_run_manifest(predictions_path),
         "n_tasks": n,
         "n_answered": answered,
         "timeouts": timeouts,
