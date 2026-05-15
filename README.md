@@ -34,7 +34,7 @@ per-task timeout.
 |---|---|---:|---:|---|
 | AssistantBench | validation | 33 | **48.5%** (soft 45.4%) | Paper's GPT-4 baseline ≈ 25% strict |
 | GAIA Level 1 | validation | 53 | **62.3%** | Paper's GPT-4+tools baseline ≈ 30%. Claude 4.5 Sonnet SOTA ≈ 82% |
-| WebBench (READ) | one-per-site sample | 448 | **22.8%** | LLM judge: `gemini-3.1-pro-preview` over task + final answer + visited URLs. Not a canonical WebBench number (canonical uses HITL or a multimodal judge). |
+| WebBench (READ) | one-per-site sample | 448 | **23.2%** | LLM judge: `gemini-3.1-pro-preview` over task + final answer + visited URLs. Not a canonical WebBench number (canonical uses HITL or a multimodal judge). |
 
 GAIA Level 1 includes all 11 attachment tasks: PNG/MP3/PY/TXT fed via
 `--task-attachment`; DOCX/XLSX/PPTX extracted to text by the runner first.
