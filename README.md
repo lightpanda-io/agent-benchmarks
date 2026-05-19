@@ -49,6 +49,117 @@ provider/model and the full launch argv, and graders splat that into
 Reproducing: `uv run <suite>-run --workers <N>` from the browser repo root
 (`--workers 4` recommended for flash-preview to stay under Gemini rate limits).
 
+## Cross-framework comparison: Lightpanda vs agent-browser, Claude+MCP
+
+To isolate the **browser tool surface** as the only variable in a head-to-head
+against [Vercel agent-browser](https://github.com/vercel-labs/agent-browser),
+both browsers can be driven by the same Claude Code session over MCP. The LLM
+(Claude Sonnet 4.6) is held constant; only the browser engine + its MCP tool
+surface differs. Lightpanda exposes `lightpanda mcp` natively; agent-browser
+ships no MCP server, so this repo includes a thin wrapper at
+[`competitors/agent-browser-mcp/`](competitors/agent-browser-mcp/) that exposes
+its CLI commands as MCP tools.
+
+Single-run numbers captured 2026-05-19 with `claude-sonnet-4-6`, 4 workers,
+1800s per-task timeout, OAuth auth (Max subscription), aggressive system
+prompt with `<ANSWER>...</ANSWER>` envelope:
+
+| Suite | Lightpanda + Claude+MCP | agent-browser + Claude+MCP | Δ |
+|---|---:|---:|---:|
+| AssistantBench (33) strict | **66.7%** | **57.6%** | **+9.1 pp** |
+| GAIA Level 1 (53) strict | **86.8%** | **84.9%** | **+1.9 pp** |
+
+By AssistantBench difficulty: Medium tied at 85.7%; Hard 52.6% vs 36.8%
+(+15.8 pp for Lightpanda). The gap appears specifically on multi-source
+aggregation tasks, where Lightpanda's `search` / `markdown` / `extract` /
+`structuredData` primitives are more efficient than agent-browser's
+lower-level CDP surface (`open` / `snapshot` / `click` / `get`).
+
+### How the comparison is locked down
+
+For the Lightpanda-MCP vs agent-browser-MCP comparison to mean anything,
+Claude must be restricted to ONLY the browser MCP — no `WebSearch`,
+`WebFetch`, `Bash`, `Read`, etc. We learned this the hard way: an earlier
+"clean" Lightpanda+MCP run actually used 67× WebSearch + 48× WebFetch + 14×
+Bash alongside the MCP tools, inflating scores by 20+ pp. The runner now
+enforces:
+
+- `--strict-mcp-config` — blocks other MCP sources (including the user's
+  own `~/.claude.json`).
+- `--disallowed-tools <comprehensive-list>` — explicit deny-list of every
+  built-in Claude Code tool. Lockdown is **load-bearing**: `--allowed-tools`
+  alone is *not* a hard restriction in `-p` mode (it's a permission-prompt
+  bypass list, not a tool restriction).
+- `--system-prompt` (full replace, not append) — replaces Claude Code's
+  default tool-use guidance so the model isn't reminded that `Bash` exists.
+- Subprocess env scrubbing — strips `ANTHROPIC_API_KEY` so `claude -p` uses
+  the keychain OAuth token (Max subscription) instead of API-key billing.
+
+Each prediction row's `trace` field captures every tool call (`{tool, args}`)
+from `claude --output-format stream-json` so the lockdown can be audited
+per-task. Across the 86 clean tasks: **zero non-MCP tool calls** beyond
+`ToolSearch` (the built-in MCP-schema loader Claude Code uses internally;
+harmless because it can't bypass `--disallowed-tools`).
+
+### What's comparable and what isn't
+
+| Comparison | Clean? |
+|---|---|
+| Lightpanda MCP vs agent-browser MCP under the same Claude session | ✓ Yes — same brain, same prompt, same envelope, same parsing |
+| Sonnet+MCP vs Flash+native-agent (e.g. 86.8% vs 62.3% GAIA) | ✗ No — three variables change at once: model, agent loop, prompt+envelope |
+
+Trying the **same prompt+envelope on Flash via the native Lightpanda agent**
+to disentangle the latter actually *decreased* Flash's scores (AB -15.2 pp,
+GAIA -18.9 pp): Flash isn't a strong-enough instruction follower for the
+`<ANSWER>` envelope (73% non-compliance on AB), and the aggressive
+persistence guidance doesn't help it either. **Per-model prompt design
+matters more than absolute prompt quality** — the published Flash baseline
+above uses the prompt that's optimal for Flash, and the Claude+MCP numbers
+use the prompt that's optimal for Sonnet.
+
+### Reproducing
+
+```bash
+# Prerequisites
+npm install -g agent-browser && agent-browser install   # binary + Chrome
+export HF_TOKEN=hf_...                                   # GAIA gated dataset
+# claude CLI on PATH using Max OAuth — do NOT export ANTHROPIC_API_KEY
+
+LP=/path/to/lightpanda/zig-out/bin/lightpanda
+
+# Lightpanda MCP backend (built-in `lightpanda mcp`)
+uv run assistantbench-mcp-run --backend lightpanda --lightpanda $LP \
+  --workers 4 --model sonnet --timeout 1800
+uv run gaia-mcp-run --backend lightpanda --lightpanda $LP \
+  --workers 4 --model sonnet --timeout 1800
+
+# agent-browser MCP backend (wrapper in competitors/agent-browser-mcp/)
+uv run assistantbench-mcp-run --backend agent-browser \
+  --agent-browser $(which agent-browser) \
+  --workers 4 --model sonnet --timeout 1800
+uv run gaia-mcp-run --backend agent-browser --workers 4 \
+  --model sonnet --timeout 1800
+```
+
+Results land in `results/<suite>-mcp/<backend>/<timestamp>/`.
+
+### Running agent-browser standalone (no MCP)
+
+A second comparison path runs agent-browser's own `chat` mode directly, which
+uses agent-browser's internal LLM loop instead of Claude. Useful for
+comparing against agent-browser-as-shipped:
+
+```bash
+# Through Vercel AI Gateway
+export AI_GATEWAY_API_KEY=vck_...
+uv run assistantbench-ab-run --model google/gemini-3-flash
+uv run gaia-ab-run --model google/gemini-3-flash
+
+# Or direct to Google's OpenAI-compat endpoint (bypasses Vercel)
+export GEMINI_DIRECT=1
+uv run assistantbench-ab-run --model gemini-3-flash-preview
+```
+
 ## Comparability across frameworks
 
 Of the three suites, only **GAIA** and **AssistantBench-strict** produce
