@@ -37,7 +37,7 @@ per-task timeout.
 | WebBench (READ) | one-per-site sample | 448 | **23.2%** | LLM judge: `gemini-3.1-pro-preview` over task + final answer + visited URLs. Not a canonical WebBench number (canonical uses HITL or a multimodal judge). |
 
 GAIA Level 1 includes all 11 attachment tasks: PNG/MP3/PY/TXT fed via
-`--task-attachment`; DOCX/XLSX/PPTX extracted to text by the runner first.
+`--attach`; DOCX/XLSX/PPTX extracted to text by the runner first.
 
 Strict counts an answer correct iff its per-task score clears the
 suite's threshold (≥ 0.5 for AssistantBench's token-F1; ≡ 1.0 for

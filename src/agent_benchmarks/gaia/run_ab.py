@@ -8,7 +8,7 @@ so the existing grader (`gaia-grade`) scores it without modification.
 
 Attachment handling
 -------------------
-agent-browser has no `--task-attachments` equivalent. The chat command is a
+agent-browser has no `--attach` equivalent. The chat command is a
 single text turn, so attachments have to be inlined into the user message.
 We match Lightpanda's "text-only effective behavior" by:
 

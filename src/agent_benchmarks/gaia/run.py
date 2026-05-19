@@ -189,7 +189,7 @@ def main(argv: list[str] | None = None) -> int:
     ds = load_dataset("gaia-benchmark/GAIA", config, split=args.split)
     rows: list[dict[str, Any]] = list(ds)
 
-    # Materialize the dataset snapshot locally so we can point `--task-attachment`
+    # Materialize the dataset snapshot locally so we can point `--attach`
     # at real file paths. Only needed when attachments aren't skipped.
     snapshot_dir: Path | None = None
     if not args.skip_attachments and any((r.get("file_name") or "").strip() for r in rows):
