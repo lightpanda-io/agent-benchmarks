@@ -1,7 +1,11 @@
 results/
+results.zip
 .venv/
 __pycache__/
 *.pyc
 *.egg-info/
 dist/
 build/
+# Upstream agent-browser checkout (vendored as a local install reference).
+# We only commit our wrapper at competitors/agent-browser-mcp/.
+competitors/agent-browser/

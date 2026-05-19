@@ -14,13 +14,26 @@ dependencies = [
     # on the --judge-model prefix: claude-* → anthropic, gemini-* → google.
     "anthropic>=0.40",
     "google-genai>=1.0",
+    "mcp>=1.0",
 ]
 
 [project.scripts]
 assistantbench-run = "agent_benchmarks.assistantbench.run:main"
 assistantbench-grade = "agent_benchmarks.assistantbench.grade:main"
+# Alternate AssistantBench runner backed by Vercel agent-browser. Writes the
+# same predictions.jsonl envelope, so `assistantbench-grade` works on its output.
+assistantbench-ab-run = "agent_benchmarks.assistantbench.run_ab:main"
+# AssistantBench driven by Claude Code + a browser MCP server
+# (--backend lightpanda or --backend agent-browser). Same predictions
+# envelope, same grader.
+assistantbench-mcp-run = "agent_benchmarks.assistantbench.run_mcp:main"
 gaia-run = "agent_benchmarks.gaia.run:main"
 gaia-grade = "agent_benchmarks.gaia.grade:main"
+# Alternate GAIA runner backed by Vercel agent-browser. Writes the same
+# predictions.jsonl envelope, so `gaia-grade` works on its output.
+gaia-ab-run = "agent_benchmarks.gaia.run_ab:main"
+# GAIA driven by Claude Code + a browser MCP server.
+gaia-mcp-run = "agent_benchmarks.gaia.run_mcp:main"
 webbench-run = "agent_benchmarks.webbench.run:main"
 webbench-grade = "agent_benchmarks.webbench.grade:main"
 
@@ -53,6 +66,11 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 [tool.ruff.lint.per-file-ignores]
 # Long lines inside SYSTEM_PROMPT literals aren't worth breaking up.
 "src/agent_benchmarks/assistantbench/run.py" = ["E501"]
+"src/agent_benchmarks/assistantbench/run_ab.py" = ["E501"]
+"src/agent_benchmarks/assistantbench/run_mcp.py" = ["E501"]
 "src/agent_benchmarks/gaia/run.py" = ["E501"]
+"src/agent_benchmarks/gaia/run_ab.py" = ["E501"]
+"src/agent_benchmarks/gaia/run_mcp.py" = ["E501"]
 "src/agent_benchmarks/webbench/run.py" = ["E501"]
 "src/agent_benchmarks/llm_judge.py" = ["E501"]
+"competitors/agent-browser-mcp/server.py" = ["E501"]
