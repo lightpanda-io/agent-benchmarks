@@ -49,31 +49,49 @@ provider/model and the full launch argv, and graders splat that into
 Reproducing: `uv run <suite>-run --workers <N>` from the browser repo root
 (`--workers 4` recommended for flash-preview to stay under Gemini rate limits).
 
-## Cross-framework comparison: Lightpanda vs agent-browser, Claude+MCP
+## Cross-framework comparison: Lightpanda vs agent-browser vs browser-use, Claude+MCP
 
 To isolate the **browser tool surface** as the only variable in a head-to-head
-against [Vercel agent-browser](https://github.com/vercel-labs/agent-browser),
-both browsers can be driven by the same Claude Code session over MCP. The LLM
-(Claude Sonnet 4.6) is held constant; only the browser engine + its MCP tool
-surface differs. Lightpanda exposes `lightpanda mcp` natively; agent-browser
-ships no MCP server, so this repo includes a thin wrapper at
-[`competitors/agent-browser-mcp/`](competitors/agent-browser-mcp/) that exposes
-its CLI commands as MCP tools.
+against other agentic browsers, each one is driven by the same Claude Code
+session over MCP. The LLM (Claude Sonnet 4.6) is held constant; only the
+browser engine + its MCP tool surface differs. Currently wired up:
 
-Single-run numbers captured 2026-05-19 with `claude-sonnet-4-6`, 4 workers,
+- **Lightpanda** — built-in `lightpanda mcp` server, text-only, no rendering.
+- **[Vercel agent-browser](https://github.com/vercel-labs/agent-browser)** —
+  ships no MCP server, so this repo includes a thin wrapper at
+  [`competitors/agent-browser-mcp/`](competitors/agent-browser-mcp/) that
+  exposes its CDP-style CLI commands as MCP tools.
+- **[browser-use](https://github.com/browser-use/browser-use)** — ships its
+  own stdio MCP server (`python -m browser_use.mcp.server`), drives full
+  Chrome via cdp-use. The runner skips `retry_with_browser_use_agent` (would
+  delegate to browser-use's own LLM and contaminate the comparison) and
+  `browser_screenshot` (multimodal input, unfair vs the text-only competitors).
+
+Single-run numbers captured 2026-05-19/20 with `claude-sonnet-4-6`, 4 workers,
 1800s per-task timeout, OAuth auth (Max subscription), aggressive system
 prompt with `<ANSWER>...</ANSWER>` envelope:
 
-| Suite | Lightpanda + Claude+MCP | agent-browser + Claude+MCP | Δ |
+| Suite | Lightpanda + Claude+MCP | agent-browser + Claude+MCP | browser-use + Claude+MCP |
 |---|---:|---:|---:|
-| AssistantBench (33) strict | **66.7%** | **57.6%** | **+9.1 pp** |
-| GAIA Level 1 (53) strict | **86.8%** | **84.9%** | **+1.9 pp** |
+| AssistantBench (33) strict | **66.7%** | **57.6%** | **39.4%** |
+| GAIA Level 1 (53) strict | **86.8%** | **84.9%** | **47.2%** |
 
-By AssistantBench difficulty: Medium tied at 85.7%; Hard 52.6% vs 36.8%
-(+15.8 pp for Lightpanda). The gap appears specifically on multi-source
-aggregation tasks, where Lightpanda's `search` / `markdown` / `extract` /
-`structuredData` primitives are more efficient than agent-browser's
-lower-level CDP surface (`open` / `snapshot` / `click` / `get`).
+By AssistantBench difficulty: Medium 85.7% / 85.7% / 71.4% (LP / AB / BU);
+Hard 52.6% / 36.8% / 15.8%. The Lightpanda↔agent-browser gap on Hard
+(+15.8 pp for LP) is concentrated on multi-source aggregation, where
+Lightpanda's `search` / `markdown` / `extract` / `structuredData`
+primitives are more efficient than agent-browser's lower-level CDP surface
+(`open` / `snapshot` / `click` / `get`).
+
+The browser-use gap on both suites is wider. Two factors visible in the
+traces: (1) per-tool latency — `browser_get_state` / `browser_navigate`
+return larger payloads and run against full Chrome with extensions,
+capping useful tool calls around ~300 per 1800s budget vs ~600–800 for
+Lightpanda; (2) the timeout rate is much higher (AB 7/33 = 21%, GAIA
+9/53 = 17%), concentrated on the same multi-source aggregation tasks
+where agent-browser also struggles but mostly still answers in time.
+GAIA tasks that fit a single source-page (Wikipedia, IMDB, Cornell LII)
+land well; the multi-hop academic-citation hunts hit the wall.
 
 ### How the comparison is locked down
 
@@ -139,6 +157,15 @@ uv run assistantbench-mcp-run --backend agent-browser \
   --workers 4 --model sonnet --timeout 1800
 uv run gaia-mcp-run --backend agent-browser --workers 4 \
   --model sonnet --timeout 1800
+
+# browser-use MCP backend (built-in `python -m browser_use.mcp.server`).
+# Needs `uv sync` (browser-use is a project dep) and a system Chrome/Chromium
+# on PATH. Each worker gets its own BROWSER_USE_CONFIG_DIR=/tmp/browser-use-mcp-<sess>
+# tempdir for profile isolation (cleaned up at run end).
+uv run assistantbench-mcp-run --backend browser-use \
+  --workers 4 --model sonnet --timeout 1800
+uv run gaia-mcp-run --backend browser-use \
+  --workers 4 --model sonnet --timeout 1800
 ```
 
 Results land in `results/<suite>-mcp/<backend>/<timestamp>/`.
@@ -159,6 +186,7 @@ uv run gaia-ab-run --model google/gemini-3-flash
 export GEMINI_DIRECT=1
 uv run assistantbench-ab-run --model gemini-3-flash-preview
 ```
+
 
 ## Comparability across frameworks
 

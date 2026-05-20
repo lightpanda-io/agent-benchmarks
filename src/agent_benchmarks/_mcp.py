@@ -30,6 +30,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 from typing import Any
@@ -99,11 +100,42 @@ AGENT_BROWSER_TOOLS: tuple[str, ...] = (
     "close",
 )
 
+# browser-use's MCP server tools. Three tools are deliberately omitted from
+# the allow-list to keep the comparison clean:
+#
+#   - retry_with_browser_use_agent: delegates the task to browser-use's OWN
+#     LLM loop using the agent's task prompt. If allowed, Claude can call it
+#     once and have browser-use's internal Gemini/Claude solve the problem,
+#     making "Claude+MCP" effectively "browser-use's agent" and contaminating
+#     the comparison.
+#   - browser_screenshot: returns an image. Multimodal input would give
+#     browser-use an unfair signal channel that Lightpanda (text-only, no
+#     rendering) and agent-browser (text accessibility tree) can't match.
+#     We pair this with `browser_get_state(include_screenshot=false)` (the
+#     default) so the surface stays text-only.
+#   - browser_list_sessions / browser_close_session / browser_close_all:
+#     session-management bookkeeping the agent doesn't need — the stdio
+#     subprocess teardown handles cleanup when claude exits.
+BROWSER_USE_TOOLS: tuple[str, ...] = (
+    "browser_navigate",
+    "browser_click",
+    "browser_type",
+    "browser_get_state",
+    "browser_extract_content",
+    "browser_get_html",
+    "browser_scroll",
+    "browser_go_back",
+    "browser_list_tabs",
+    "browser_switch_tab",
+    "browser_close_tab",
+)
+
 # MCP server-name keys. These show up in `mcp__<key>__<tool>` allow-list
 # entries, so keep them stable.
 SERVER_NAME = {
     "lightpanda": "lightpanda",
     "agent-browser": "agent-browser",
+    "browser-use": "browser-use",
 }
 
 
@@ -135,6 +167,46 @@ def resolve_agent_browser_bin(arg: str | None) -> str:
     )
 
 
+def ensure_browser_use_prereqs(python_bin: str | None = None) -> tuple[bool, str]:
+    """Check the browser-use MCP backend can launch.
+
+    Two things must be in place:
+      1. The `browser_use` package importable in `python_bin` (defaults to
+         this interpreter, which is the venv when run via `uv run`).
+      2. A system Chrome / Chromium binary on PATH — browser-use uses cdp-use
+         (not Playwright) and probes `which google-chrome / chromium`.
+
+    Returns (ok, hint_message). Hint is empty on success; on failure it's a
+    user-facing one-or-two-line message safe to print directly.
+    """
+    python = python_bin or sys.executable
+    try:
+        proc = subprocess.run(
+            [python, "-c", "import browser_use"],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError) as e:
+        return False, f"failed to spawn {python!r} to verify browser-use: {e!r}"
+    if proc.returncode != 0:
+        return False, (
+            f"{python} cannot import `browser_use` "
+            f"(stderr: {proc.stderr.strip()[:200]}).\n"
+            "  Did you `uv sync`? The benchmarks pyproject pulls browser-use in."
+        )
+
+    for cmd in ("google-chrome", "google-chrome-stable", "chromium", "chromium-browser"):
+        if shutil.which(cmd):
+            return True, ""
+    return False, (
+        "no Chrome/Chromium binary found on PATH. browser-use needs a system "
+        "Chrome install — try `sudo apt install chromium` (Debian/Ubuntu) or "
+        "install Google Chrome from https://www.google.com/chrome/."
+    )
+
+
 def ensure_executable(path: str | Path) -> bool:
     s = str(path)
     if "/" in s or "\\" in s:
@@ -154,7 +226,10 @@ def build_mcp_config(
 
     `session` is per-worker — passed into the MCP server's env so parallel
     workers don't share a Chrome (agent-browser) or trip over each other's
-    Lightpanda state.
+    Lightpanda state. For browser-use the per-worker isolation comes from
+    spawning a fresh `python -m browser_use.mcp.server` per claude call
+    (each subprocess gets its own Chromium); the session string is unused
+    there but kept for signature symmetry.
     """
     if backend == "lightpanda":
         if lightpanda_bin is None:
@@ -186,6 +261,31 @@ def build_mcp_config(
                 }
             }
         }
+    if backend == "browser-use":
+        python = python_bin or sys.executable
+        per_worker_config_dir = _prepare_browser_use_worker_dir(session)
+        return {
+            "mcpServers": {
+                SERVER_NAME["browser-use"]: {
+                    "type": "stdio",
+                    "command": python,
+                    "args": ["-m", "browser_use.mcp.server"],
+                    "env": {
+                        "BROWSER_USE_LOGGING_LEVEL": "critical",
+                        "BROWSER_USE_SETUP_LOGGING": "false",
+                        "ANONYMIZED_TELEMETRY": "false",
+                        "BROWSER_USE_TELEMETRY_ENABLED": "false",
+                        "BROWSER_USE_CONFIG_DIR": str(per_worker_config_dir),
+                        # LOAD-BEARING: the MCP server's profile_data dict
+                        # has `headless: False` hardcoded (mcp/server.py:592).
+                        # `_load_config()` reads BROWSER_USE_HEADLESS and the
+                        # per-worker config.json we wrote above splats it
+                        # into the BrowserProfile via `**profile_config`.
+                        "BROWSER_USE_HEADLESS": "true",
+                    },
+                }
+            }
+        }
     raise ValueError(f"unknown backend: {backend}")
 
 
@@ -204,6 +304,9 @@ def allowed_tools_for(backend: str) -> str:
     elif backend == "agent-browser":
         server = SERVER_NAME["agent-browser"]
         tools = AGENT_BROWSER_TOOLS
+    elif backend == "browser-use":
+        server = SERVER_NAME["browser-use"]
+        tools = BROWSER_USE_TOOLS
     else:
         raise ValueError(f"unknown backend: {backend}")
     return ",".join(f"mcp__{server}__{t}" for t in tools)
@@ -264,6 +367,40 @@ def disallowed_builtin_tools() -> str:
     return ",".join(DISALLOWED_BUILTIN_TOOLS)
 
 
+# MCP-tool deny-list per backend. `--allowed-tools` is only a permission-prompt
+# bypass list in `claude -p` mode (NOT a hard restriction) — for built-in tools
+# we deny via DISALLOWED_BUILTIN_TOOLS, and we need the same hard deny for MCP
+# tools the comparison must exclude. Without these entries, Claude happily
+# called `mcp__browser-use__browser_screenshot` 47× and
+# `mcp__browser-use__retry_with_browser_use_agent` 31× in the first browser-use
+# run even though they were absent from --allowed-tools.
+#
+# Lightpanda's surface has no equivalents to exclude — `extract` etc. are
+# purely structural and intended to be available. agent-browser likewise has
+# no LLM-backed or multimodal tool to hide. Only browser-use's MCP server
+# ships tools that would contaminate the text-only-parity comparison.
+DISALLOWED_MCP_TOOLS_BY_BACKEND: dict[str, tuple[str, ...]] = {
+    "lightpanda": (),
+    "agent-browser": (),
+    "browser-use": (
+        # Multimodal — text-only-parity violation.
+        "mcp__browser-use__browser_screenshot",
+        # Delegates the entire task to browser-use's internal LLM loop —
+        # would short-circuit the Sonnet brain we're comparing.
+        "mcp__browser-use__retry_with_browser_use_agent",
+        # Session-management housekeeping the agent doesn't need; not
+        # contamination per se, just noise.
+        "mcp__browser-use__browser_list_sessions",
+        "mcp__browser-use__browser_close_session",
+        "mcp__browser-use__browser_close_all",
+    ),
+}
+
+
+def disallowed_mcp_tools(backend: str) -> str:
+    return ",".join(DISALLOWED_MCP_TOOLS_BY_BACKEND.get(backend, ()))
+
+
 def make_session_pool(workers: int, prefix: str) -> queue.Queue[str]:
     """One stable session-name per worker, reused across tasks so a worker
     keeps its MCP-server subprocess (and hence its browser) warm."""
@@ -294,6 +431,67 @@ def close_agent_browser_sessions(binary: str, sessions: list[str]) -> None:
                 timeout=10,
                 check=False,
             )
+
+
+def _prepare_browser_use_worker_dir(session: str) -> Path:
+    """Create per-worker config + profile dirs for browser-use's MCP server.
+
+    Without this, parallel workers ALL try to read+lock the same source
+    user-data-dir at ~/.config/browseruse/profiles/default. Only the first
+    worker's Chrome wins the SingletonLock; the others hang indefinitely
+    in `_copy_profile()` waiting for the lock. Observed in the wild:
+    workers=4 → only 1 Chrome ever spawns, the other 3 MCP servers sit at
+    ~1% CPU forever.
+
+    The MCP server hardcodes `user_data_dir='~/.config/browseruse/profiles/default'`
+    in its profile_data dict (mcp/server.py:589) and there's no
+    BROWSER_USE_USER_DATA_DIR env override. The path it DOES read is the
+    config.json (loaded via BROWSER_USE_CONFIG_DIR → load_config()), and
+    `**profile_config` from that config splats over the hardcoded default.
+    So we write a per-worker config.json with a per-worker user_data_dir.
+    Each worker then drives a distinct Chrome profile, no lock contention.
+
+    Returns the per-worker config dir to use as BROWSER_USE_CONFIG_DIR.
+    Idempotent — repeated calls within the same worker session reuse the
+    same dir. The cleanup_browser_use_profiles() helper rm-rfs these at
+    the end of a run.
+    """
+    worker_root = Path(tempfile.gettempdir()) / f"browser-use-mcp-{session}"
+    profile_dir = worker_root / "profiles" / "default"
+    profile_dir.mkdir(parents=True, exist_ok=True)
+    # config.json schema: see browser_use.config.DBStyleConfigJSON.
+    # The MCP server's _load_config() flattens the default browser_profile
+    # entry into a dict of field values. user_data_dir here overrides the
+    # hardcoded MCP default; headless is also set defensively (the
+    # BROWSER_USE_HEADLESS env var sets it too — belt-and-suspenders so a
+    # future browser-use bump that drops the env hook still stays headless).
+    profile_id = f"bench-{session}"
+    config_doc = {
+        "browser_profile": {
+            profile_id: {
+                "id": profile_id,
+                "default": True,
+                "user_data_dir": str(profile_dir),
+                "headless": True,
+            }
+        },
+        "llm": {},
+        "agent": {},
+    }
+    (worker_root / "config.json").write_text(json.dumps(config_doc, indent=2))
+    return worker_root
+
+
+def cleanup_browser_use_profiles(sessions: list[str]) -> None:
+    """Remove the per-worker browser-use profile dirs created by
+    build_mcp_config(backend="browser-use"). Each one is ~100 MB of Chrome
+    profile data — a 4-worker, 53-task run accumulates ~400 MB in /tmp
+    that would otherwise stick around until reboot. Best-effort, errors
+    swallowed (the OS cleans /tmp eventually anyway)."""
+    for name in sessions:
+        path = Path(tempfile.gettempdir()) / f"browser-use-mcp-{name}"
+        with contextlib.suppress(OSError):
+            shutil.rmtree(path, ignore_errors=True)
 
 
 def run_mcp_task(
@@ -336,10 +534,15 @@ def run_mcp_task(
         "--allowed-tools",
         allowed_tools,
         # Hard-deny every non-MCP built-in tool so the browser MCP is the
-        # ONLY way Claude can do work. See DISALLOWED_BUILTIN_TOOLS for why
-        # this is load-bearing (not --allowed-tools).
+        # ONLY way Claude can do work, AND any MCP tools the comparison must
+        # exclude (e.g. browser-use's screenshot and retry_with_agent). See
+        # DISALLOWED_BUILTIN_TOOLS / DISALLOWED_MCP_TOOLS_BY_BACKEND — both
+        # are load-bearing (--allowed-tools is permission-prompt bypass only,
+        # not a hard restriction, in `claude -p` mode).
         "--disallowed-tools",
-        disallowed_builtin_tools(),
+        ",".join(
+            t for t in (disallowed_builtin_tools(), disallowed_mcp_tools(backend)) if t
+        ),
         "--system-prompt",
         system_prompt,
     ]
@@ -510,7 +713,7 @@ def add_common_mcp_args(parser: Any) -> None:
     """Shared argparse flags for an MCP-backed suite runner."""
     parser.add_argument(
         "--backend",
-        choices=["lightpanda", "agent-browser"],
+        choices=["lightpanda", "agent-browser", "browser-use"],
         required=True,
         help="Which browser MCP to drive Claude with.",
     )
