@@ -31,7 +31,7 @@ Example:
 
     HF_TOKEN=... AI_GATEWAY_API_KEY=gw_... uv run gaia-ab-run --limit 3
     HF_TOKEN=... GEMINI_DIRECT=1 GOOGLE_API_KEY=... \\
-      uv run gaia-ab-run --workers 2 --model gemini-3-flash-preview
+      uv run gaia-ab-run --workers 2 --model gemini-3.5-flash
 """
 
 from __future__ import annotations

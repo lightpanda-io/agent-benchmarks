@@ -62,7 +62,7 @@ uv run webbench-run --limit 3
 # Single site, 4 parallel runs (web_name = host with www. stripped)
 uv run webbench-run --site allrecipes.com --workers 4
 
-# Full READ subset (1,637 tasks, ~3.3h with 4 workers on flash-preview)
+# Full READ subset (1,637 tasks, ~3.3h with 4 workers on gemini-3.5-flash)
 # Skip inline grading so you can re-grade later with a different judge.
 uv run webbench-run --workers 4 --no-grade
 

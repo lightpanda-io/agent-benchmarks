@@ -27,14 +27,14 @@ own runner, grader, and README.
 ## Current results
 
 Lightpanda agent via zenai, default system prompts. Single-run numbers
-captured 2026-05-14 with `gemini-3-flash-preview`, 4 workers, 600s
+captured 2026-05-20 with `gemini-3.5-flash`, 4 workers, 600s
 per-task timeout.
 
 | Suite | Split | n | Strict | Notes |
 |---|---|---:|---:|---|
-| AssistantBench | validation | 33 | **48.5%** (soft 45.4%) | Paper's GPT-4 baseline ≈ 25% strict |
-| GAIA Level 1 | validation | 53 | **62.3%** | Paper's GPT-4+tools baseline ≈ 30%. Claude 4.5 Sonnet SOTA ≈ 82% |
-| WebBench (READ) | one-per-site sample | 448 | **23.2%** | LLM judge: `gemini-3.1-pro-preview` over task + final answer + visited URLs. Not a canonical WebBench number (canonical uses HITL or a multimodal judge). |
+| AssistantBench | validation | 33 | **63.6%** (soft 55.4%) | Paper's GPT-4 baseline ≈ 25% strict |
+| GAIA Level 1 | validation | 53 | **75.5%** | Paper's GPT-4+tools baseline ≈ 30%. Claude 4.5 Sonnet SOTA ≈ 82% |
+| WebBench (READ) | one-per-site sample | 448 | **25.4%** | LLM judge: `gemini-3.1-pro-preview` over task + final answer + visited URLs. Not a canonical WebBench number (canonical uses HITL or a multimodal judge). |
 
 GAIA Level 1 includes all 11 attachment tasks: PNG/MP3/PY/TXT fed via
 `--attach`; DOCX/XLSX/PPTX extracted to text by the runner first.
@@ -47,7 +47,7 @@ provider/model and the full launch argv, and graders splat that into
 `scores.json` for provenance.
 
 Reproducing: `uv run <suite>-run --workers <N>` from the browser repo root
-(`--workers 4` recommended for flash-preview to stay under Gemini rate limits).
+(`--workers 4` recommended to stay under Gemini rate limits).
 
 ## Cross-framework comparison: Lightpanda vs agent-browser vs browser-use, Claude+MCP
 
@@ -124,16 +124,13 @@ harmless because it can't bypass `--disallowed-tools`).
 | Comparison | Clean? |
 |---|---|
 | Lightpanda MCP vs agent-browser MCP under the same Claude session | ✓ Yes — same brain, same prompt, same envelope, same parsing |
-| Sonnet+MCP vs Flash+native-agent (e.g. 86.8% vs 62.3% GAIA) | ✗ No — three variables change at once: model, agent loop, prompt+envelope |
+| Sonnet+MCP vs Flash+native-agent (e.g. 86.8% vs 75.5% GAIA) | ✗ No — three variables change at once: model, agent loop, prompt+envelope |
 
-Trying the **same prompt+envelope on Flash via the native Lightpanda agent**
-to disentangle the latter actually *decreased* Flash's scores (AB -15.2 pp,
-GAIA -18.9 pp): Flash isn't a strong-enough instruction follower for the
-`<ANSWER>` envelope (73% non-compliance on AB), and the aggressive
-persistence guidance doesn't help it either. **Per-model prompt design
-matters more than absolute prompt quality** — the published Flash baseline
-above uses the prompt that's optimal for Flash, and the Claude+MCP numbers
-use the prompt that's optimal for Sonnet.
+**Per-model prompt design matters more than absolute prompt quality** —
+the published Flash baseline above uses the prompt that's optimal for
+Flash (simple "Output ONLY the answer" + early-bail), and the Claude+MCP
+numbers use the prompt that's optimal for Sonnet (strict `<ANSWER>`
+envelope + persistence guidance).
 
 ### Reproducing
 
@@ -179,12 +176,12 @@ comparing against agent-browser-as-shipped:
 ```bash
 # Through Vercel AI Gateway
 export AI_GATEWAY_API_KEY=vck_...
-uv run assistantbench-ab-run --model google/gemini-3-flash
-uv run gaia-ab-run --model google/gemini-3-flash
+uv run assistantbench-ab-run --model google/gemini-3.5-flash
+uv run gaia-ab-run --model google/gemini-3.5-flash
 
 # Or direct to Google's OpenAI-compat endpoint (bypasses Vercel)
 export GEMINI_DIRECT=1
-uv run assistantbench-ab-run --model gemini-3-flash-preview
+uv run assistantbench-ab-run --model gemini-3.5-flash
 ```
 
 
