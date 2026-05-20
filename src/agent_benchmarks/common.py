@@ -17,7 +17,7 @@ import subprocess
 import sys
 import time
 from collections.abc import Callable, Iterable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -316,7 +316,7 @@ def resolve_out_dir(out_dir_arg: Path | None, project_root: Path, suite_name: st
     if out_dir_arg is not None:
         out_dir = out_dir_arg
     else:
-        ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
         out_dir = project_root / "results" / suite_name / ts
     out_dir.mkdir(parents=True, exist_ok=True)
     return out_dir
@@ -389,7 +389,7 @@ def write_run_manifest(out_dir: Path, *, agent_provider: str, agent_model: str |
         "agent_provider": agent_provider,
         "agent_model": agent_model,
         "argv": sys.argv,
-        "started_at": datetime.now(timezone.utc).isoformat(),
+        "started_at": datetime.now(UTC).isoformat(),
     }
     (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2))
 

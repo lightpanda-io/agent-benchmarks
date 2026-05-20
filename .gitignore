@@ -6,6 +6,13 @@ __pycache__/
 *.egg-info/
 dist/
 build/
-# Upstream agent-browser checkout (vendored as a local install reference).
-# We only commit our wrapper at competitors/agent-browser-mcp/.
+# Optional local checkout of the agent-browser source (handy for reading the
+# upstream code). We do NOT vendor it — agent-browser is installed separately
+# via `npm install -g agent-browser`. Ignored so an accidental clone in this
+# path isn't tracked. The only agent-browser-related thing we DO commit is
+# the MCP wrapper at competitors/agent-browser-mcp/.
 competitors/agent-browser/
+# Optional local checkout of the browser-use source (same reason). We do NOT
+# vendor it — the Python package is pulled from PyPI via the pyproject.toml
+# dependency, and the MCP server runs via `python -m browser_use.mcp.server`.
+competitors/browser-use/

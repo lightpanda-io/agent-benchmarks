@@ -2,9 +2,10 @@
 GAIA runner that drives a browser MCP server through `claude -p`.
 
 Mirrors `assistantbench-mcp-run` for GAIA: hold the LLM brain (Claude)
-constant; vary only the browser MCP (`--backend lightpanda` vs
-`--backend agent-browser`). Writes the same predictions.jsonl envelope as
-`gaia-run`, so `gaia-grade` reads it without modification.
+constant; vary only the browser MCP (`--backend lightpanda`,
+`--backend agent-browser`, or `--backend browser-use`). Writes the same
+predictions.jsonl envelope as `gaia-run`, so `gaia-grade` reads it without
+modification.
 
 Attachment handling matches `gaia/run_ab.py`:
 
@@ -19,11 +20,14 @@ Prerequisites:
   - `claude` CLI on PATH (or pass --claude)
   - For --backend lightpanda: a built lightpanda binary
   - For --backend agent-browser: agent-browser installed
+  - For --backend browser-use: `uv sync` (pulls in browser-use) + a system
+    Chrome/Chromium binary on PATH
 
 Example:
 
     HF_TOKEN=... uv run gaia-mcp-run --backend lightpanda --limit 3
     HF_TOKEN=... uv run gaia-mcp-run --backend agent-browser --workers 2
+    HF_TOKEN=... uv run gaia-mcp-run --backend browser-use --workers 2
 """
 
 from __future__ import annotations
@@ -40,8 +44,10 @@ from .._mcp import (
     add_common_mcp_args,
     allowed_tools_for,
     build_mcp_config,
+    cleanup_browser_use_profiles,
     close_agent_browser_sessions,
     drain_pool,
+    ensure_browser_use_prereqs,
     ensure_executable,
     make_session_pool,
     resolve_agent_browser_bin,
@@ -179,6 +185,11 @@ def main(argv: list[str] | None = None) -> int:
                 file=sys.stderr,
             )
             return 2
+    elif args.backend == "browser-use":
+        ok, hint = ensure_browser_use_prereqs()
+        if not ok:
+            print(f"error: {hint}", file=sys.stderr)
+            return 2
 
     out_dir = resolve_out_dir(args.out_dir, PROJECT_ROOT, f"gaia-mcp/{args.backend}")
     predictions_path = out_dir / "predictions.jsonl"
@@ -283,8 +294,11 @@ def main(argv: list[str] | None = None) -> int:
             preview_fn=lambda row: row["Question"],
         )
     finally:
+        sessions = drain_pool(pool)
         if args.backend == "agent-browser" and agent_browser_bin is not None:
-            close_agent_browser_sessions(agent_browser_bin, drain_pool(pool))
+            close_agent_browser_sessions(agent_browser_bin, sessions)
+        elif args.backend == "browser-use":
+            cleanup_browser_use_profiles(sessions)
 
     print("\nGrading...", file=sys.stderr)
     emit_scores(grade_predictions(predictions_path), out_dir)

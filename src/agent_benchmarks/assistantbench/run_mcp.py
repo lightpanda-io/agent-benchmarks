@@ -16,11 +16,15 @@ Prerequisites:
   - For --backend agent-browser:  agent-browser installed
     (npm install -g agent-browser && agent-browser install), and the
     `mcp` Python SDK installed in this venv (already a project dep).
+  - For --backend browser-use:  `browser-use` Python package installed
+    (`uv sync` pulls it in via project deps), and a system Chrome/Chromium
+    on PATH (browser-use uses cdp-use, not Playwright).
 
 Example:
 
     uv run assistantbench-mcp-run --backend lightpanda --limit 3
     uv run assistantbench-mcp-run --backend agent-browser --workers 2
+    uv run assistantbench-mcp-run --backend browser-use --workers 2
 """
 
 from __future__ import annotations
@@ -36,8 +40,10 @@ from .._mcp import (
     add_common_mcp_args,
     allowed_tools_for,
     build_mcp_config,
+    cleanup_browser_use_profiles,
     close_agent_browser_sessions,
     drain_pool,
+    ensure_browser_use_prereqs,
     ensure_executable,
     make_session_pool,
     resolve_agent_browser_bin,
@@ -160,6 +166,11 @@ def main(argv: list[str] | None = None) -> int:
                 file=sys.stderr,
             )
             return 2
+    elif args.backend == "browser-use":
+        ok, hint = ensure_browser_use_prereqs()
+        if not ok:
+            print(f"error: {hint}", file=sys.stderr)
+            return 2
 
     out_dir = resolve_out_dir(args.out_dir, PROJECT_ROOT, f"assistantbench-mcp/{args.backend}")
     predictions_path = out_dir / "predictions.jsonl"
@@ -230,11 +241,16 @@ def main(argv: list[str] | None = None) -> int:
             preview_fn=lambda row: row["task"],
         )
     finally:
-        # Only the agent-browser backend has lingering daemons — Lightpanda's
-        # `lightpanda mcp` is a fresh process spawned per claude call and
-        # exits when stdio closes.
+        # Backend-specific cleanup. Lightpanda's `lightpanda mcp` is a fresh
+        # process per claude call and exits when stdio closes — nothing to do.
+        # agent-browser leaves a per-session Chrome daemon alive that has to
+        # be told to close. browser-use leaves a per-worker profile tempdir
+        # that we should rm-rf so /tmp doesn't accumulate hundreds of MBs.
+        sessions = drain_pool(pool)
         if args.backend == "agent-browser" and agent_browser_bin is not None:
-            close_agent_browser_sessions(agent_browser_bin, drain_pool(pool))
+            close_agent_browser_sessions(agent_browser_bin, sessions)
+        elif args.backend == "browser-use":
+            cleanup_browser_use_profiles(sessions)
 
     print("\nGrading...", file=sys.stderr)
     emit_scores(grade_predictions(predictions_path), out_dir)
