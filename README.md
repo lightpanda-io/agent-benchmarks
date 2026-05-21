@@ -56,38 +56,67 @@ against other agentic browsers, each one is driven by the same Claude Code
 session over MCP. The LLM (Claude Sonnet 4.6) is held constant; only the
 browser engine + its MCP tool surface differs. Currently wired up:
 
-- **Lightpanda** — built-in `lightpanda mcp` server, text-only, no rendering.
-- **[Vercel agent-browser](https://github.com/vercel-labs/agent-browser)** —
-  ships no MCP server, so this repo includes a thin wrapper at
+- **Lightpanda native MCP** — built-in `lightpanda mcp` server, text-only,
+  no rendering. Tool surface tailored to agent workflows
+  (`search` / `markdown` / `extract` / `structuredData`).
+- **agent-browser + Chromium** —
+  [Vercel agent-browser](https://github.com/vercel-labs/agent-browser) ships
+  no MCP server, so this repo includes a thin wrapper at
   [`competitors/agent-browser-mcp/`](competitors/agent-browser-mcp/) that
-  exposes its CDP-style CLI commands as MCP tools.
-- **[browser-use](https://github.com/browser-use/browser-use)** — ships its
-  own stdio MCP server (`python -m browser_use.mcp.server`), drives full
-  Chrome via cdp-use. The runner skips `retry_with_browser_use_agent` (would
-  delegate to browser-use's own LLM and contaminate the comparison) and
-  `browser_screenshot` (multimodal input, unfair vs the text-only competitors).
+  exposes its CDP-style CLI commands as MCP tools, driving headless Chrome.
+- **agent-browser + Lightpanda engine** — same wrapper, same agent-browser
+  tool surface, but `AGENT_BROWSER_ENGINE=lightpanda` swaps Chrome for
+  Lightpanda underneath. Isolates "browser engine" from "tool surface" —
+  comparing this row to the Chromium row above tells you what the engine
+  swap costs/saves; comparing it to the Lightpanda native MCP row tells
+  you what the tool-surface change costs/saves.
+- **[browser-use](https://github.com/browser-use/browser-use) (Chromium)** —
+  ships its own stdio MCP server (`python -m browser_use.mcp.server`),
+  drives full Chrome via cdp-use. The runner skips
+  `retry_with_browser_use_agent` (would delegate to browser-use's own LLM
+  and contaminate the comparison) and `browser_screenshot` (multimodal
+  input, unfair vs the text-only competitors).
 
-Single-run numbers captured 2026-05-19/20 with `claude-sonnet-4-6`, 4 workers,
-1800s per-task timeout, OAuth auth (Max subscription), aggressive system
-prompt with `<ANSWER>...</ANSWER>` envelope:
+Single-run numbers captured 2026-05-19..2026-05-21 with `claude-sonnet-4-6`,
+4 workers, 1800s per-task timeout, OAuth auth (Max subscription), aggressive
+system prompt with `<ANSWER>...</ANSWER>` envelope:
 
-| Suite | Lightpanda + Claude+MCP | agent-browser + Claude+MCP | browser-use + Claude+MCP |
-|---|---:|---:|---:|
-| AssistantBench (33) strict | **66.7%** | **57.6%** | **39.4%** |
-| GAIA Level 1 (53) strict | **86.8%** | **84.9%** | **47.2%** |
+| Suite | Lightpanda native MCP | agent-browser + Chromium | agent-browser + Lightpanda | browser-use (Chromium) |
+|---|---:|---:|---:|---:|
+| AssistantBench (33) strict     | **66.7%** | 57.6%  | 57.6%  | 39.4%  |
+| AssistantBench avg duration    | 765 s     | 1121 s | 1035 s | 1167 s |
+| AssistantBench timeouts        | 4 / 33    | 10 / 33 | 7 / 33 | 6 / 33 |
+| GAIA Level 1 (53) strict       | **86.8%** | 84.9%  | 81.1%  | 47.2%  |
+| GAIA Level 1 avg duration      | 228 s     | 321 s  | 447 s  | 837 s  |
+| GAIA Level 1 timeouts          | 1 / 53    | 2 / 53 | 5 / 53 | 9 / 53 |
 
-By AssistantBench difficulty: Medium 85.7% / 85.7% / 71.4% (LP / AB / BU);
-Hard 52.6% / 36.8% / 15.8%. The Lightpanda↔agent-browser gap on Hard
-(+15.8 pp for LP) is concentrated on multi-source aggregation, where
-Lightpanda's `search` / `markdown` / `extract` / `structuredData`
-primitives are more efficient than agent-browser's lower-level CDP surface
-(`open` / `snapshot` / `click` / `get`).
+By AssistantBench difficulty (Lightpanda native / AB+Chromium / AB+Lightpanda
+/ browser-use): Medium 85.7% / 85.7% / 85.7% / 71.4%; Hard 52.6% / 36.8% /
+36.8% / 15.8%. The Lightpanda↔agent-browser gap on Hard (+15.8 pp for
+Lightpanda's native MCP) is concentrated on multi-source aggregation, where
+Lightpanda's `search` / `markdown` / `extract` / `structuredData` primitives
+are more efficient than agent-browser's lower-level CDP surface (`open` /
+`snapshot` / `click` / `get`) — *and that gap survives the engine swap*:
+running agent-browser's tool surface against Lightpanda-the-engine produces
+the same 36.8% on Hard as running it against Chrome. The tool surface, not
+the engine, is what moves the AssistantBench needle.
+
+**What the engine swap shows.** On AssistantBench, swapping Chrome →
+Lightpanda inside agent-browser is a free speed/reliability win: identical
+57.6% strict, but **−86 s per task on average and 3 fewer timeouts**. On
+GAIA, the swap pays a small accuracy tax (**−3.8 pp**, 81.1% vs 84.9%) and
+runs **126 s/task slower** with 5 timeouts vs 2. The extra GAIA failures
+are concentrated on pages where the rendered text payload differs from
+Chrome's — archive.org snapshots, BBC, Reddit, and similar JS-dependent
+pages where Lightpanda's text-only rendering misses content Chrome would
+have shown. AssistantBench tasks lean on structured authoritative sources
+(Wikipedia, retailer pages, Yelp), where this gap doesn't bite.
 
 The browser-use gap on both suites is wider. Two factors visible in the
 traces: (1) per-tool latency — `browser_get_state` / `browser_navigate`
 return larger payloads and run against full Chrome with extensions,
 capping useful tool calls around ~300 per 1800s budget vs ~600–800 for
-Lightpanda; (2) the timeout rate is much higher (AB 7/33 = 21%, GAIA
+Lightpanda; (2) the timeout rate is much higher (AB 6/33 = 18%, GAIA
 9/53 = 17%), concentrated on the same multi-source aggregation tasks
 where agent-browser also struggles but mostly still answers in time.
 GAIA tasks that fit a single source-page (Wikipedia, IMDB, Cornell LII)
@@ -154,6 +183,18 @@ uv run assistantbench-mcp-run --backend agent-browser \
   --workers 4 --model sonnet --timeout 1800
 uv run gaia-mcp-run --backend agent-browser --workers 4 \
   --model sonnet --timeout 1800
+
+# agent-browser MCP backend, but with Lightpanda as the underlying engine
+# instead of Chrome. The wrapper sets AGENT_BROWSER_ENGINE=lightpanda and
+# AGENT_BROWSER_EXECUTABLE_PATH=$LP on the per-worker agent-browser daemon,
+# so every CDP call goes to Lightpanda. Same Claude brain, same MCP tool
+# surface, just a different engine — isolates engine vs tool-surface.
+uv run assistantbench-mcp-run --backend agent-browser-lightpanda \
+  --agent-browser $(which agent-browser) --lightpanda $LP \
+  --workers 4 --model sonnet --timeout 1800
+uv run gaia-mcp-run --backend agent-browser-lightpanda \
+  --agent-browser $(which agent-browser) --lightpanda $LP \
+  --workers 4 --model sonnet --timeout 1800
 
 # browser-use MCP backend (built-in `python -m browser_use.mcp.server`).
 # Needs `uv sync` (browser-use is a project dep) and a system Chrome/Chromium

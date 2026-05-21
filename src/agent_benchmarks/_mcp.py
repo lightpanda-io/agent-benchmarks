@@ -131,10 +131,14 @@ BROWSER_USE_TOOLS: tuple[str, ...] = (
 )
 
 # MCP server-name keys. These show up in `mcp__<key>__<tool>` allow-list
-# entries, so keep them stable.
+# entries, so keep them stable. `agent-browser-lightpanda` deliberately
+# reuses the `agent-browser` server name — same MCP tool surface (the
+# agent-browser-mcp wrapper), just a different underlying engine — so the
+# allow-list and tool-name conventions don't fork.
 SERVER_NAME = {
     "lightpanda": "lightpanda",
     "agent-browser": "agent-browser",
+    "agent-browser-lightpanda": "agent-browser",
     "browser-use": "browser-use",
 }
 
@@ -244,20 +248,33 @@ def build_mcp_config(
                 },
             }
         }
-    if backend == "agent-browser":
+    if backend in ("agent-browser", "agent-browser-lightpanda"):
         if agent_browser_bin is None:
-            raise ValueError("agent_browser_bin is required for the agent-browser backend")
+            raise ValueError(
+                f"agent_browser_bin is required for the {backend} backend"
+            )
         python = python_bin or sys.executable
+        env: dict[str, str] = {
+            "AGENT_BROWSER_BIN": agent_browser_bin,
+            "AGENT_BROWSER_SESSION": session,
+        }
+        if backend == "agent-browser-lightpanda":
+            # agent-browser reads AGENT_BROWSER_ENGINE / AGENT_BROWSER_EXECUTABLE_PATH
+            # at daemon-spawn time. The MCP-wrapper subprocess inherits these,
+            # so the per-worker daemon picks them up on its first call.
+            if lightpanda_bin is None:
+                raise ValueError(
+                    "lightpanda_bin is required for the agent-browser-lightpanda backend"
+                )
+            env["AGENT_BROWSER_ENGINE"] = "lightpanda"
+            env["AGENT_BROWSER_EXECUTABLE_PATH"] = str(lightpanda_bin)
         return {
             "mcpServers": {
-                SERVER_NAME["agent-browser"]: {
+                SERVER_NAME[backend]: {
                     "type": "stdio",
                     "command": python,
                     "args": [str(_AGENT_BROWSER_MCP_SERVER)],
-                    "env": {
-                        "AGENT_BROWSER_BIN": agent_browser_bin,
-                        "AGENT_BROWSER_SESSION": session,
-                    },
+                    "env": env,
                 }
             }
         }
@@ -301,8 +318,8 @@ def allowed_tools_for(backend: str) -> str:
     if backend == "lightpanda":
         server = SERVER_NAME["lightpanda"]
         tools = LIGHTPANDA_TOOLS
-    elif backend == "agent-browser":
-        server = SERVER_NAME["agent-browser"]
+    elif backend in ("agent-browser", "agent-browser-lightpanda"):
+        server = SERVER_NAME[backend]
         tools = AGENT_BROWSER_TOOLS
     elif backend == "browser-use":
         server = SERVER_NAME["browser-use"]
@@ -382,6 +399,7 @@ def disallowed_builtin_tools() -> str:
 DISALLOWED_MCP_TOOLS_BY_BACKEND: dict[str, tuple[str, ...]] = {
     "lightpanda": (),
     "agent-browser": (),
+    "agent-browser-lightpanda": (),
     "browser-use": (
         # Multimodal — text-only-parity violation.
         "mcp__browser-use__browser_screenshot",
@@ -713,9 +731,12 @@ def add_common_mcp_args(parser: Any) -> None:
     """Shared argparse flags for an MCP-backed suite runner."""
     parser.add_argument(
         "--backend",
-        choices=["lightpanda", "agent-browser", "browser-use"],
+        choices=["lightpanda", "agent-browser", "agent-browser-lightpanda", "browser-use"],
         required=True,
-        help="Which browser MCP to drive Claude with.",
+        help="Which browser MCP to drive Claude with. `agent-browser-lightpanda` "
+        "drives agent-browser's MCP tools but with Lightpanda as the underlying "
+        "engine instead of Chrome (passes AGENT_BROWSER_ENGINE=lightpanda + "
+        "AGENT_BROWSER_EXECUTABLE_PATH=--lightpanda to the agent-browser daemon).",
     )
     parser.add_argument(
         "--claude",

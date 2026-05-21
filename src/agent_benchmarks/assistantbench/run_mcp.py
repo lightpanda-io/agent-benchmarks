@@ -166,6 +166,29 @@ def main(argv: list[str] | None = None) -> int:
                 file=sys.stderr,
             )
             return 2
+    elif args.backend == "agent-browser-lightpanda":
+        agent_browser_bin = resolve_agent_browser_bin(args.agent_browser)
+        if not ensure_executable(agent_browser_bin):
+            print(
+                f"error: agent-browser binary not found at {agent_browser_bin!r}",
+                file=sys.stderr,
+            )
+            print(
+                "hint: install with `npm install -g agent-browser` "
+                "(no `agent-browser install` step needed — we drive Lightpanda, not Chrome). "
+                "Or set $AGENT_BROWSER_BIN.",
+                file=sys.stderr,
+            )
+            return 2
+        lightpanda_bin = resolve_lightpanda_bin(args.lightpanda, PROJECT_ROOT)
+        if not lightpanda_bin.exists():
+            print(f"error: lightpanda binary not found at {lightpanda_bin}", file=sys.stderr)
+            print(
+                "hint: build with `zig build -Doptimize=ReleaseFast` in the lightpanda repo, "
+                "then pass --lightpanda <path> if it isn't at zig-out/bin/lightpanda.",
+                file=sys.stderr,
+            )
+            return 2
     elif args.backend == "browser-use":
         ok, hint = ensure_browser_use_prereqs()
         if not ok:
@@ -247,7 +270,7 @@ def main(argv: list[str] | None = None) -> int:
         # be told to close. browser-use leaves a per-worker profile tempdir
         # that we should rm-rf so /tmp doesn't accumulate hundreds of MBs.
         sessions = drain_pool(pool)
-        if args.backend == "agent-browser" and agent_browser_bin is not None:
+        if args.backend in ("agent-browser", "agent-browser-lightpanda") and agent_browser_bin is not None:
             close_agent_browser_sessions(agent_browser_bin, sessions)
         elif args.backend == "browser-use":
             cleanup_browser_use_profiles(sessions)
