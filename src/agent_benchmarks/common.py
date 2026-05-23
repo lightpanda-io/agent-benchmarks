@@ -23,6 +23,29 @@ from typing import Any
 
 STDERR_TAIL_BYTES = 8 * 1024
 
+# <ANSWER>...</ANSWER> envelope. Prompts that instruct the agent to wrap its
+# final answer in these tags let us extract the canonical answer separate
+# from any reasoning prose. Multi-line answers (lists, JSON dicts) are
+# allowed inside, hence re.DOTALL. If the agent emits multiple envelopes
+# (e.g. demonstrating format inside its reasoning), prefer the LAST one —
+# that's what models tend to use for the final answer.
+ANSWER_RE = re.compile(r"<ANSWER>(.*?)</ANSWER>", re.DOTALL | re.IGNORECASE)
+
+
+def extract_answer_envelope(prediction: str) -> tuple[str, str | None]:
+    """If `prediction` contains one or more <ANSWER>...</ANSWER> blocks,
+    return the last one (stripped). Otherwise return the raw prediction
+    with a note so the caller can record that the envelope was missing —
+    useful for diagnosing format non-compliance without losing the partial
+    signal.
+    """
+    if not prediction:
+        return prediction, None
+    matches = ANSWER_RE.findall(prediction)
+    if not matches:
+        return prediction, "no <ANSWER> envelope found; using raw result"
+    return matches[-1].strip(), None
+
 # Cap each Lightpanda subprocess's memory + swap via a systemd-run user-scope
 # cgroup, when systemd-run is available. Lightpanda has a known regression on
 # some JS-heavy pages (GitHub Copilot marketing, etc.) where RSS balloons to

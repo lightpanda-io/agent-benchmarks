@@ -26,6 +26,7 @@ from datasets import load_dataset  # type: ignore[import-not-found]
 from ..common import (
     add_common_runner_args,
     emit_scores,
+    extract_answer_envelope,
     load_completed_ids,
     print_lightpanda_missing,
     resolve_lightpanda_binary,
@@ -43,27 +44,50 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 # system prompt tailored to the benchmark. Preserves the load-bearing CSS
 # selector rules so tool use still works.
 SYSTEM_PROMPT = """\
-You are a research assistant driving the Lightpanda browser on an open-web QA benchmark.
+You are a research assistant driving the Lightpanda headless browser on an open-web QA benchmark.
 
-For each task:
-1. Plan: identify the most authoritative source (official website, known database, or a search engine). Prefer direct sites (IMDB, Wikipedia, shipping carriers, official brand pages) over search engines when you know the source.
-2. Navigate: use search, goto, tree, markdown, extract, findElement to inspect pages.
-3. Final answer format — your entire last message is graded verbatim, character-for-character:
-   - Output ONLY the answer. No preface ("Based on...", "The answer is...", "Here's..."), no explanation, no caveats, no closing remarks, no source citations.
-   - No markdown: no **bold**, no *italics*, no `code`, no bullets, no headings, no asterisks anywhere in the final reply.
-   - Numbers: bare digits only — no units, no `$`, no comma separators, no parenthetical rationale.
-   - Names/titles: complete and verbatim, no decoration.
-   - URLs: bare URL only.
-   - Lists: one item per line, nothing else.
-   - JSON dicts: one JSON object per line, no surrounding prose.
-   - DO: `45` / `Oko, Thief of Crowns` / `https://example.com/foo`
-   - DON'T: `**45**` / `Based on the page, the answer is 45.` / `* 45 (calculated as 4 × $12)` / `The card banned was **Oko, Thief of Crowns**.`
-4. Small-candidate questions ("A, B, or C", yes/no): always pick one — never abstain.
-5. Be decisive. Target ≤10 tool calls per task. If you hit that budget, or a site returns errors, or a tool call repeatedly fails, or you cannot extract the needed info, commit to your best-effort answer from prior knowledge rather than continuing to search. Model knowledge is a valid last resort — preferable to no answer.
-6. Only respond "unknown" if you have exhausted navigation AND prior knowledge gives no lead.
+The Lightpanda browser tools are the ONLY way you can access the web. There is no WebSearch, no WebFetch, no shortcut — you must navigate real pages. Your tool surface includes `search`, `goto`, `tree`, `markdown`, `extract`, `structuredData`, `findElement`, `interactiveElements`, `links`, `click`, `fill`, `hover`, `selectOption`, `setChecked`, `press`, `scroll`, `waitForSelector`, `nodeDetails`, `getUrl`, `eval`, `consoleLogs`, `detectForms`.
 
-Search-engine use:
-- For web searches, use the `search` tool — do NOT goto google.com or other search engines directly. With `TAVILY_API_KEY` set, the tool queries the Tavily Search API and returns a clean numbered list of {title, url, snippet}; without the key, it falls back to scraping the DuckDuckGo HTML endpoint. Google scraping is blocked by Lightpanda's User-Agent and TLS fingerprint.
+BE PERSISTENT — this is the load-bearing instruction:
+- This benchmark expects multi-step browsing. Most tasks need 20-50 tool calls; some need 100+. Answers from prior knowledge without browsing score 0.
+- If a search returns poor results, try DIFFERENT phrasings — synonyms, narrower queries, different angles. Don't repeat the same query.
+- If a page is unreachable, find a DIFFERENT source. Wikipedia, official sites, news outlets, Yelp, store directories — be creative.
+- If extraction fails, try a different tool (markdown → tree → extract → structuredData → findElement).
+- Do NOT respond "unknown" or fall back to prior knowledge until you have made at least 20 substantive tool calls AND tried at least 3 different sources/angles.
+- Small-candidate questions ("A, B, or C", yes/no): always pick one — never abstain.
+
+Strategy:
+1. Plan: identify the most authoritative source. Prefer direct sites (Wikipedia, official, retailer) over search-engine results when you know the source.
+2. Search: use the `search` tool — do NOT goto google.com directly. With `TAVILY_API_KEY` set, `search` queries Tavily and returns a clean numbered list of {title, url, snippet}; without the key, it falls back to scraping the DuckDuckGo HTML endpoint. Google scraping is blocked by Lightpanda's User-Agent and TLS fingerprint.
+3. Navigate: open the source, inspect, extract.
+4. Re-inspect after page-changing actions — DOM snapshots and node ids go stale.
+5. Cross-check on a second source where the gold answer is non-obvious (lists, numerical estimates).
+
+Final-answer envelope — STRICT
+================================
+Your entire response will be discarded except for the LAST text wrapped in `<ANSWER>...</ANSWER>` tags. Reasoning, tool-call narration, partial-credit notes — anything outside the envelope — is ignored. Only the envelope contents are graded.
+
+Format INSIDE the envelope:
+- No preface, no explanation, no markdown, no source citations.
+- Numbers: bare digits only — no units, no `$`, no comma separators.
+- Names/titles: complete and verbatim, no decoration.
+- URLs: bare URL only.
+- Lists: one item per line, nothing else.
+- JSON dicts: one JSON object per line, no surrounding prose.
+
+Examples (good):
+  <ANSWER>45</ANSWER>
+  <ANSWER>Oko, Thief of Crowns</ANSWER>
+  <ANSWER>https://example.com/foo</ANSWER>
+  <ANSWER>CrossFit East River
+  Avea Pilates</ANSWER>
+
+Examples (bad — these all score 0):
+  Based on my research, <ANSWER>45</ANSWER>           ← prose outside is fine, but…
+  <ANSWER>**45**</ANSWER>                              ← markdown inside
+  <ANSWER>The answer is 45.</ANSWER>                   ← preface inside
+  <ANSWER>$45</ANSWER>                                 ← currency
+  <ANSWER>~45</ANSWER>                                 ← approximation marker
 
 Tool-use rules:
 - Never use backendNodeId with click, fill, hover, selectOption, or setChecked. Always use a CSS selector.
@@ -74,8 +98,8 @@ Tool-use rules:
 
 TASK_PROMPT_TEMPLATE = (
     "{task}\n\n"
-    "Output ONLY the answer — no preface, no explanation, no markdown (no **bold**, no asterisks, "
-    "no bullets). For a list, one item per line. For a number, bare digits only."
+    "Wrap your final answer in <ANSWER>...</ANSWER>. For a list, one item per line "
+    "inside the envelope. For a number, bare digits only inside the envelope."
 )
 
 
@@ -115,6 +139,9 @@ def main(argv: list[str] | None = None) -> int:
             task_prompt=TASK_PROMPT_TEMPLATE.format(task=row["task"]),
             timeout_s=args.timeout,
         )
+        pred, envelope_note = extract_answer_envelope(pred)
+        if envelope_note:
+            stderr_tail = (stderr_tail or "") + f"\n[envelope]\n{envelope_note}\n"
         return {
             "id": row["id"],
             "task": row["task"],

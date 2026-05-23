@@ -34,6 +34,7 @@ from datasets import load_dataset  # type: ignore[import-not-found]
 from ..common import (
     add_common_runner_args,
     emit_scores,
+    extract_answer_envelope,
     load_completed_ids,
     print_lightpanda_missing,
     resolve_lightpanda_binary,
@@ -110,25 +111,46 @@ def _preprocess_attachment(path: Path) -> Path:
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 SYSTEM_PROMPT = """\
-You are a research assistant driving the Lightpanda browser on an open-web QA benchmark.
+You are a research assistant driving the Lightpanda headless browser on the GAIA QA benchmark.
 
-For each task:
-1. Plan: identify the most authoritative source (official website, known database, or a search engine). Prefer direct sites (Wikipedia, shipping carriers, official brand pages) over search engines when you know the source.
-2. Navigate: use search, goto, tree, markdown, extract, findElement to inspect pages.
-3. Final answer format — your entire last message is graded verbatim, character-for-character:
-   - Output ONLY the exact value requested. No preface ("Based on...", "The answer is...", "Here's..."), no explanation, no caveats, no closing remarks.
-   - No markdown: no **bold**, no *italics*, no `code`, no bullets, no headings, no asterisks anywhere in the final reply.
-   - Numbers: bare digits — no comma separators, no currency unless asked, no units beyond what's asked.
-   - Names/titles: complete and verbatim, no decoration, no surrounding punctuation.
-   - Lists: comma-separated on one line.
-   - DO: `45` / `Oko, Thief of Crowns` / `Paris, London, Tokyo`
-   - DON'T: `**45**` / `The answer is 45.` / `* Paris\n* London\n* Tokyo` / `**Oko, Thief of Crowns**`
-4. Small-candidate questions ("A, B, or C", yes/no): always pick one — never abstain.
-5. If a site returns errors, a tool call repeatedly fails, or you cannot extract the needed info, fall back to your best-effort answer from prior knowledge rather than staying empty. Model knowledge is a valid last resort — preferable to no answer.
-6. Only respond "unknown" if you have exhausted navigation AND prior knowledge gives no lead.
+The Lightpanda browser tools are the ONLY way you can access the web. There is no WebSearch, no WebFetch, no shortcut — you must navigate real pages. Your tool surface includes `search`, `goto`, `tree`, `markdown`, `extract`, `structuredData`, `findElement`, `interactiveElements`, `links`, `click`, `fill`, `hover`, `selectOption`, `setChecked`, `press`, `scroll`, `waitForSelector`, `nodeDetails`, `getUrl`, `eval`, `consoleLogs`, `detectForms`.
 
-Search-engine use:
-- For web searches, use the `search` tool — do NOT goto google.com or other search engines directly. With `TAVILY_API_KEY` set, the tool queries the Tavily Search API and returns a clean numbered list of {title, url, snippet}; without the key, it falls back to scraping the DuckDuckGo HTML endpoint. Google scraping is blocked by Lightpanda's User-Agent and TLS fingerprint.
+BE PERSISTENT — this is the load-bearing instruction:
+- GAIA tasks expect multi-step browsing. Most need 20-50 tool calls; some need 100+. Answers from prior knowledge without browsing score 0.
+- If a search returns poor results, try DIFFERENT phrasings — synonyms, narrower queries, different angles.
+- If a page is unreachable, find a DIFFERENT source. Wikipedia, official sites, archived pages, news outlets.
+- If extraction fails, try a different tool (markdown → tree → extract → structuredData → findElement).
+- Do NOT respond "unknown" or fall back to prior knowledge until you have made at least 20 substantive tool calls AND tried at least 3 different sources/angles.
+- Small-candidate questions ("A, B, or C", yes/no): always pick one — never abstain.
+
+Strategy:
+1. Plan: prefer authoritative direct sources (Wikipedia, official sites) over search-engine landing pages when you know where to go.
+2. Search: use the `search` tool — do NOT goto google.com directly. With `TAVILY_API_KEY` set, `search` queries Tavily and returns a clean numbered list of {title, url, snippet}; without the key, it falls back to scraping the DuckDuckGo HTML endpoint. Google scraping is blocked by Lightpanda's User-Agent and TLS fingerprint.
+3. Navigate the available browser tools. Re-inspect after page-changing actions — DOM snapshots and node ids go stale.
+4. Cross-check on a second source where the answer is non-obvious.
+
+Final-answer envelope — STRICT
+================================
+Your entire response will be discarded except for the LAST text wrapped in `<ANSWER>...</ANSWER>` tags. Reasoning, tool-call narration, partial-credit notes — anything outside the envelope — is ignored. Only the envelope contents are graded.
+
+GAIA grades by exact match after normalization (lowercase, strip articles/punct).
+
+Format INSIDE the envelope:
+- No preface, no explanation, no markdown, no source citations.
+- Numbers: bare digits — no comma separators, no currency unless asked, no units beyond what's asked.
+- Names/titles: complete and verbatim, no decoration, no surrounding punctuation.
+- Lists: comma-separated on one line.
+
+Examples (good):
+  <ANSWER>45</ANSWER>
+  <ANSWER>Oko, Thief of Crowns</ANSWER>
+  <ANSWER>Paris, London, Tokyo</ANSWER>
+
+Examples (bad — these score 0):
+  <ANSWER>**45**</ANSWER>                              ← markdown inside
+  <ANSWER>The answer is 45.</ANSWER>                   ← preface inside
+  <ANSWER>$45</ANSWER>                                 ← currency
+  <ANSWER>1,234</ANSWER>                               ← comma separator
 
 Tool-use rules:
 - Never use backendNodeId with click, fill, hover, selectOption, or setChecked. Always use a CSS selector.
@@ -139,8 +161,8 @@ Tool-use rules:
 
 TASK_PROMPT_TEMPLATE = (
     "{task}\n\n"
-    "Output ONLY the exact answer — no preface, no explanation, no markdown (no **bold**, "
-    "no asterisks, no bullets), no units beyond what's asked. Bare digits for numbers."
+    "Wrap your final answer in <ANSWER>...</ANSWER>. Inside the envelope: "
+    "bare digits for numbers, comma-separated on one line for lists, no markdown."
 )
 
 
@@ -243,6 +265,9 @@ def main(argv: list[str] | None = None) -> int:
             if tmp_to_delete is not None:
                 with contextlib.suppress(OSError):
                     tmp_to_delete.unlink()
+        pred, envelope_note = extract_answer_envelope(pred)
+        if envelope_note:
+            stderr_tail = (stderr_tail or "") + f"\n[envelope]\n{envelope_note}\n"
         return {
             "id": row["task_id"],
             "task": row["Question"],

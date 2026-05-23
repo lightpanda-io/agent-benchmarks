@@ -26,7 +26,6 @@ import contextlib
 import json
 import os
 import queue
-import re
 import shutil
 import subprocess
 import sys
@@ -35,13 +34,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-# <ANSWER>...</ANSWER> envelope. The system prompt tells Claude to wrap its
-# final answer in these tags so we can extract the canonical answer separate
-# from any reasoning prose. Multi-line answers (e.g. AssistantBench lists,
-# JSON dicts) are allowed inside, hence re.DOTALL. If Claude emits multiple
-# envelopes (e.g. demonstrating format inside its reasoning), prefer the
-# LAST one — that's what models tend to use for the final answer.
-_ANSWER_RE = re.compile(r"<ANSWER>(.*?)</ANSWER>", re.DOTALL | re.IGNORECASE)
+from .common import extract_answer_envelope as _extract_answer_envelope
 
 STDERR_TAIL_BYTES = 8 * 1024
 
@@ -710,21 +703,6 @@ def _parse_claude_stream(stdout: str) -> tuple[str, list[dict[str, Any]], str | 
 
     note = "; ".join(note_parts) if note_parts else None
     return prediction, trace, note
-
-
-def _extract_answer_envelope(prediction: str) -> tuple[str, str | None]:
-    """If `prediction` contains one or more <ANSWER>...</ANSWER> blocks,
-    return the last one (stripped). Otherwise return the raw prediction
-    with a note so the caller can see in stderr_tail that the envelope was
-    missing — useful for diagnosing format non-compliance without losing
-    the partial signal.
-    """
-    if not prediction:
-        return prediction, None
-    matches = _ANSWER_RE.findall(prediction)
-    if not matches:
-        return prediction, "no <ANSWER> envelope found; using raw result"
-    return matches[-1].strip(), None
 
 
 def add_common_mcp_args(parser: Any) -> None:
