@@ -32,7 +32,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from ..common import mean, read_run_manifest
+from ..common import mean, read_run_manifest, summarize_usage
 
 _PUNCT_TABLE = str.maketrans("", "", string.punctuation)
 
@@ -231,6 +231,7 @@ def grade_predictions(predictions_path: Path) -> dict[str, Any]:
     answered = sum(1 for t, _ in scored if (t.get("prediction") or "").strip())
     timeouts = sum(1 for t, _ in scored if t.get("timed_out"))
     durations = [t.get("duration_s", 0.0) for t, _ in scored]
+    usage_summary = summarize_usage(t for t, _ in scored)
 
     by_diff: dict[str, list[float]] = {}
     for t, s in scored:
@@ -253,6 +254,7 @@ def grade_predictions(predictions_path: Path) -> dict[str, Any]:
             for k, v in sorted(by_diff.items())
         },
         "avg_duration_s": mean(durations),
+        **usage_summary,
         "per_task": [
             {
                 "id": t.get("id"),
@@ -260,6 +262,7 @@ def grade_predictions(predictions_path: Path) -> dict[str, Any]:
                 "score": s,
                 "timed_out": bool(t.get("timed_out")),
                 "duration_s": t.get("duration_s"),
+                "usage": t.get("usage"),
             }
             for t, s in scored
         ],

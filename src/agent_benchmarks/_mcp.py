@@ -515,14 +515,17 @@ def run_mcp_task(
     task_prompt: str,
     model: str | None,
     timeout_s: float,
-) -> tuple[str, float, bool, str, int | None, list[dict[str, Any]]]:
+) -> tuple[str, float, bool, str, int | None, list[dict[str, Any]], dict[str, Any] | None]:
     """Run one benchmark task through `claude -p` + the chosen MCP backend.
 
-    Returns (prediction, duration_s, timed_out, stderr_tail, returncode, trace).
+    Returns (prediction, duration_s, timed_out, stderr_tail, returncode, trace, usage).
     `prediction` is the final `result` event of claude's stream-json output.
     `trace` is a list of `{tool, args}` entries — one per tool call Claude
     made, in order. Used to audit that Claude only hit MCP tools, not any
     built-in Claude Code tool.
+    `usage` is the per-task token/cost summary parsed from the stream — see
+    `_parse_claude_stream` for the schema. None if no usage was emitted (e.g.
+    claude failed before any assistant turn).
     On error or empty output, the prediction is an empty string and the
     error is surfaced via stderr_tail.
     """
@@ -605,7 +608,7 @@ def run_mcp_task(
 
     duration_s = time.monotonic() - started
 
-    prediction, trace, parse_note = _parse_claude_stream(stdout)
+    prediction, trace, usage, parse_note = _parse_claude_stream(stdout)
     prediction, envelope_note = _extract_answer_envelope(prediction)
     note = "; ".join(n for n in (parse_note, envelope_note) if n)
     if note:
@@ -618,10 +621,12 @@ def run_mcp_task(
     else:
         stderr_tail = stderr
 
-    return prediction, duration_s, timed_out, stderr_tail, returncode, trace
+    return prediction, duration_s, timed_out, stderr_tail, returncode, trace, usage
 
 
-def _parse_claude_stream(stdout: str) -> tuple[str, list[dict[str, Any]], str | None]:
+def _parse_claude_stream(
+    stdout: str,
+) -> tuple[str, list[dict[str, Any]], dict[str, Any] | None, str | None]:
     """Parse `claude --print --output-format=stream-json --verbose` output.
 
     The stream is one JSON object per line. We care about three event shapes:
@@ -634,28 +639,56 @@ def _parse_claude_stream(stdout: str) -> tuple[str, list[dict[str, Any]], str | 
           {"type":"thinking","thinking":"..."},
           {"type":"tool_use","id":"...","name":"mcp__lightpanda__goto",
            "input":{"url":"..."}}
-      ]}}
+      ],"usage":{"input_tokens":...,"cache_read_input_tokens":...,
+                 "cache_creation_input_tokens":...,"output_tokens":...}}}
         – tool calls live in content blocks of type "tool_use".
+          `message.usage` is the per-turn token count from the Anthropic API
+          response; we sum these to get the total billed for the run.
 
       {"type":"result","subtype":"success","is_error":false,
-       "result":"<final text>","permission_denials":[...]}
+       "result":"<final text>","permission_denials":[...],
+       "usage":{...},"total_cost_usd":0.0234,"num_turns":N,"duration_ms":...}
         – final answer. permission_denials lists any tool calls Claude
           attempted that the allow-list blocked; non-empty means leakage
           would have happened without --allowed-tools.
+          `total_cost_usd` is the aggregated billed dollar cost.
 
-    Returns (prediction, trace, note). `trace` is a list of
+    Returns (prediction, trace, usage, note). `trace` is a list of
     `{"tool": name, "args": parsed_input}` entries in call order. We do NOT
     store tool_result payloads — they're huge (snapshots) and the audit
     purpose only needs the call sites.
+
+    `usage` schema (None if no assistant turn was seen):
+      {
+        "input_tokens":              sum across all turns (non-cached new input),
+        "cache_read_input_tokens":   sum across turns (replayed context),
+        "cache_creation_input_tokens": sum across turns,
+        "output_tokens":             sum across turns,
+        "num_turns":                 number of assistant API calls,
+        "final_turn_input_tokens":   peak context = last turn's
+                                     input + cache_read + cache_creation
+                                     (≈ how full the context window got),
+        "total_cost_usd":            from the result event (None if absent),
+      }
     """
     stripped = stdout.strip()
     if not stripped:
-        return "", [], "empty stdout from claude --print"
+        return "", [], None, "empty stdout from claude --print"
 
     trace: list[dict[str, Any]] = []
     prediction = ""
     note_parts: list[str] = []
     saw_result = False
+
+    usage_totals = {
+        "input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation_input_tokens": 0,
+        "output_tokens": 0,
+    }
+    num_turns = 0
+    final_turn_input = 0
+    total_cost_usd: float | None = None
 
     for ln_no, ln in enumerate(stripped.splitlines(), 1):
         ln = ln.strip()
@@ -671,7 +704,8 @@ def _parse_claude_stream(stdout: str) -> tuple[str, list[dict[str, Any]], str | 
 
         etype = evt.get("type")
         if etype == "assistant":
-            content = (evt.get("message") or {}).get("content") or []
+            message = evt.get("message") or {}
+            content = message.get("content") or []
             for block in content:
                 if isinstance(block, dict) and block.get("type") == "tool_use":
                     trace.append(
@@ -680,6 +714,16 @@ def _parse_claude_stream(stdout: str) -> tuple[str, list[dict[str, Any]], str | 
                             "args": block.get("input", {}),
                         }
                     )
+            turn_usage = message.get("usage") or {}
+            if turn_usage:
+                num_turns += 1
+                turn_input_total = 0
+                for k in usage_totals:
+                    v = turn_usage.get(k) or 0
+                    usage_totals[k] += v
+                    if k != "output_tokens":
+                        turn_input_total += v
+                final_turn_input = turn_input_total
         elif etype == "result":
             saw_result = True
             denials = evt.get("permission_denials") or []
@@ -696,13 +740,27 @@ def _parse_claude_stream(stdout: str) -> tuple[str, list[dict[str, Any]], str | 
                 prediction = result.strip()
             else:
                 note_parts.append(f"non-string `result` field: {type(result).__name__}")
+            cost = evt.get("total_cost_usd")
+            if isinstance(cost, (int, float)):
+                total_cost_usd = float(cost)
         # else: system, user (tool_result), status events — skipped
 
     if not saw_result:
         note_parts.append("no terminal `result` event in stream")
 
+    usage: dict[str, Any] | None
+    if num_turns:
+        usage = {
+            **usage_totals,
+            "num_turns": num_turns,
+            "final_turn_input_tokens": final_turn_input,
+            "total_cost_usd": total_cost_usd,
+        }
+    else:
+        usage = None
+
     note = "; ".join(note_parts) if note_parts else None
-    return prediction, trace, note
+    return prediction, trace, usage, note
 
 
 def add_common_mcp_args(parser: Any) -> None:

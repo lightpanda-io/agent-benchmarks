@@ -265,7 +265,7 @@ def main(argv: list[str] | None = None) -> int:
                 agent_browser_bin=agent_browser_bin,
                 session=session,
             )
-            pred, duration_s, timed_out, stderr_tail, rc, trace = run_mcp_task(
+            pred, duration_s, timed_out, stderr_tail, rc, trace, usage = run_mcp_task(
                 claude_bin=claude_bin,
                 backend=args.backend,
                 mcp_config=cfg,
@@ -291,6 +291,7 @@ def main(argv: list[str] | None = None) -> int:
             "attachment_status": attach_status,
             "backend": args.backend,
             "trace": trace,
+            "usage": usage,
             "stderr_tail": stderr_tail,
         }
 

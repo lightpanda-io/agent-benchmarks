@@ -345,6 +345,79 @@ def resolve_out_dir(out_dir_arg: Path | None, project_root: Path, suite_name: st
     return out_dir
 
 
+def summarize_usage(tasks: Iterable[dict[str, Any]]) -> dict[str, Any]:
+    """Roll a list of predictions.jsonl rows into avg/total token+cost stats.
+
+    Reads `row["usage"]` (the schema produced by `_parse_claude_stream` in
+    `_mcp.py`). Returns a dict ready to splice into scores.json:
+
+      {
+        "n_with_usage": <int>,
+        "avg_input_tokens": <non-cached input, summed across turns>,
+        "avg_cache_read_input_tokens": <cached/replayed context>,
+        "avg_cache_creation_input_tokens": <new cache writes>,
+        "avg_output_tokens": <model output>,
+        "avg_num_turns": <assistant API calls per task>,
+        "avg_final_turn_input_tokens": <peak context window per task>,
+        "avg_total_cost_usd": <per task>,
+        "total_cost_usd": <sum across tasks>,
+      }
+
+    Tasks without usage (older runs, gemini-driven runs) are skipped — the
+    `n_with_usage` count tells you how many contributed.
+    Returns `{"n_with_usage": 0}` if nothing usable is found.
+    """
+    rows: list[dict[str, Any]] = []
+    for t in tasks:
+        u = t.get("usage")
+        if isinstance(u, dict):
+            rows.append(u)
+    if not rows:
+        return {"n_with_usage": 0}
+
+    def _avg(key: str) -> float:
+        vals = [r.get(key) or 0 for r in rows]
+        return sum(vals) / len(rows)
+
+    costs = [r.get("total_cost_usd") for r in rows]
+    cost_vals = [c for c in costs if isinstance(c, (int, float))]
+    return {
+        "n_with_usage": len(rows),
+        "avg_input_tokens": _avg("input_tokens"),
+        "avg_cache_read_input_tokens": _avg("cache_read_input_tokens"),
+        "avg_cache_creation_input_tokens": _avg("cache_creation_input_tokens"),
+        "avg_output_tokens": _avg("output_tokens"),
+        "avg_num_turns": _avg("num_turns"),
+        "avg_final_turn_input_tokens": _avg("final_turn_input_tokens"),
+        "avg_total_cost_usd": (sum(cost_vals) / len(cost_vals)) if cost_vals else None,
+        "total_cost_usd": sum(cost_vals) if cost_vals else None,
+    }
+
+
+def _format_usage_summary(usage: dict[str, Any] | None) -> str:
+    """One-line `in/out/ctx tok, $cost ` for the per-task progress line.
+
+    `in`  = total non-cached input tokens summed across turns
+    `out` = total output tokens
+    `ctx` = peak context window = final turn's (input + cache_read + cache_creation),
+            i.e. how full the window got at the end of the conversation
+    """
+    if not usage:
+        return ""
+
+    def _k(v: float | int) -> str:
+        if v >= 1000:
+            return f"{v/1000:.1f}k"
+        return str(int(v))
+
+    inp = usage.get("input_tokens", 0)
+    out = usage.get("output_tokens", 0)
+    ctx = usage.get("final_turn_input_tokens", 0)
+    cost = usage.get("total_cost_usd")
+    cost_str = f", ${cost:.3f}" if isinstance(cost, (int, float)) else ""
+    return f"in={_k(inp)} out={_k(out)} ctx={_k(ctx)}{cost_str} "
+
+
 def run_benchmark_tasks(
     pending: list[dict[str, Any]],
     work_fn: Callable[[dict[str, Any]], dict[str, Any]],
@@ -376,9 +449,10 @@ def run_benchmark_tasks(
             preds.write(json.dumps(result) + "\n")
             preds.flush()
             tail = f" — {preview_fn(row)[:80]}" if preview_fn else ""
+            usage_str = _format_usage_summary(result.get("usage"))
             print(
                 f"[{idx}/{total}] {status_label(result)} "
-                f"{result['duration_s']:.1f}s {result['id'][:12]}{tail}",
+                f"{result['duration_s']:.1f}s {usage_str}{result['id'][:12]}{tail}",
                 file=sys.stderr,
             )
 

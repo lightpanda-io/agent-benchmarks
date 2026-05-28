@@ -31,7 +31,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from ..common import mean, read_run_manifest
+from ..common import mean, read_run_manifest, summarize_usage
 
 _ARTICLES = {"a", "an", "the"}
 _PUNCT_TABLE = str.maketrans("", "", string.punctuation)
@@ -167,6 +167,7 @@ def grade_predictions(predictions_path: Path) -> dict[str, Any]:
     answered = sum(1 for t, _, _ in scored if (t.get("prediction") or "").strip())
     timeouts = sum(1 for t, _, _ in scored if t.get("timed_out"))
     durations = [t.get("duration_s", 0.0) for t, _, _ in scored]
+    usage_summary = summarize_usage(t for t, _, _ in scored)
 
     by_level: dict[str, list[tuple[float, float]]] = {}
     per_task: list[dict[str, Any]] = []
@@ -181,6 +182,7 @@ def grade_predictions(predictions_path: Path) -> dict[str, Any]:
                 "score_soft": s_soft,
                 "timed_out": bool(t.get("timed_out")),
                 "duration_s": t.get("duration_s"),
+                "usage": t.get("usage"),
             }
         )
 
@@ -200,6 +202,7 @@ def grade_predictions(predictions_path: Path) -> dict[str, Any]:
             for k, v in sorted(by_level.items())
         },
         "avg_duration_s": mean(durations),
+        **usage_summary,
         "per_task": per_task,
     }
 
