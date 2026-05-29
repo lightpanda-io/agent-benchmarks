@@ -177,7 +177,7 @@ def main(argv: list[str] | None = None) -> int:
     pending = [r for r in rows if r["id"] not in completed]
 
     def _work(row: dict[str, Any]) -> dict[str, Any]:
-        pred, duration_s, timed_out, stderr_tail, rc, trace = run_lightpanda_task(
+        pred, duration_s, timed_out, stderr_tail, rc, trace, _usage = run_lightpanda_task(
             lightpanda=lightpanda,
             provider=args.provider,
             model=args.model,

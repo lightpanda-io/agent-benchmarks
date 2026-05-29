@@ -166,6 +166,45 @@ def parse_tool_trace(stderr: str) -> list[dict[str, Any]]:
     return trace
 
 
+def parse_lightpanda_usage(stderr: str) -> dict[str, Any] | None:
+    """Pull the `$usage prompt=… completion=… …` summary line that
+    `lightpanda agent --task` writes to stderr at end of one-shot mode.
+    Returns the parsed usage dict or None if the line is absent (older
+    binaries, or runs that crashed before printing it).
+    """
+    if not stderr or "$usage " not in stderr:
+        return None
+    # Scan from the bottom so a partial echo earlier in stderr doesn't win.
+    for line in reversed(stderr.splitlines()):
+        line = line.strip()
+        if not line.startswith("$usage "):
+            continue
+        out: dict[str, Any] = {}
+        for kv in line[len("$usage "):].split():
+            if "=" not in kv:
+                continue
+            k, v = kv.split("=", 1)
+            try:
+                out[k] = int(v)
+            except ValueError:
+                continue
+        if not out:
+            return None
+        # Normalize to the same shape the MCP path emits (input_tokens etc.)
+        # so downstream summarize_usage and the progress-line formatter
+        # handle both paths uniformly.
+        return {
+            "input_tokens": out.get("prompt", 0),
+            "output_tokens": out.get("completion", 0),
+            "cache_read_input_tokens": out.get("cached", 0),
+            "cache_creation_input_tokens": out.get("cache_creation", 0),
+            "num_turns": 0,  # native agent doesn't expose per-turn count
+            "final_turn_input_tokens": 0,  # likewise
+            "total_cost_usd": None,  # native path doesn't compute this itself
+        }
+    return None
+
+
 def run_lightpanda_task(
     *,
     lightpanda: Path,
@@ -176,13 +215,15 @@ def run_lightpanda_task(
     task_prompt: str,
     attachment: Path | None = None,
     timeout_s: float,
-) -> tuple[str, float, bool, str, int | None, list[dict[str, Any]]]:
+) -> tuple[str, float, bool, str, int | None, list[dict[str, Any]], dict[str, Any] | None]:
     """Run a single task through lightpanda.
 
-    Returns (prediction, duration_s, timed_out, stderr_tail, returncode, trace).
+    Returns (prediction, duration_s, timed_out, stderr_tail, returncode, trace, usage).
     `trace` is the parsed tool-call list from the full stderr stream, captured
     before the tail-truncation step — so it survives long runs where the
     first tool calls would otherwise roll off the 8 KiB stderr tail.
+    `usage` is the parsed `$usage` summary line emitted by recent agent
+    builds; None if the binary didn't emit one.
     """
     cmd: list[str] = [str(lightpanda), "agent", "--provider", provider]
     if model:
@@ -233,6 +274,7 @@ def run_lightpanda_task(
     # Parse trace from the FULL stderr before we truncate — otherwise long
     # runs lose their early tool calls along with the head of stderr.
     trace = parse_tool_trace(stderr)
+    usage = parse_lightpanda_usage(stderr)
 
     if len(stderr) > STDERR_TAIL_BYTES:
         stderr_tail = "...[truncated]...\n" + stderr[-STDERR_TAIL_BYTES:]
@@ -240,7 +282,7 @@ def run_lightpanda_task(
         stderr_tail = stderr
 
     prediction = stdout.strip()
-    return prediction, duration_s, timed_out, stderr_tail, returncode, trace
+    return prediction, duration_s, timed_out, stderr_tail, returncode, trace, usage
 
 
 def load_completed_ids(predictions_path: Path) -> set[str]:

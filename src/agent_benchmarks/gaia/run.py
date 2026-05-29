@@ -251,7 +251,7 @@ def main(argv: list[str] | None = None) -> int:
                     )
                     attachment = raw
         try:
-            pred, duration_s, timed_out, stderr_tail, rc, trace = run_lightpanda_task(
+            pred, duration_s, timed_out, stderr_tail, rc, trace, usage = run_lightpanda_task(
                 lightpanda=lightpanda,
                 provider=args.provider,
                 model=args.model,
@@ -279,6 +279,7 @@ def main(argv: list[str] | None = None) -> int:
             "level": row.get("Level"),
             "file_name": file_name or None,
             "trace": trace,
+            "usage": usage,
             "stderr_tail": stderr_tail,
         }
 
