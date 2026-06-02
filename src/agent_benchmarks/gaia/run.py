@@ -142,7 +142,6 @@ Format INSIDE the envelope:
 - Numbers: bare digits — no comma separators, no currency unless asked, no units beyond what's asked.
 - Names/titles: complete and verbatim, no decoration, no surrounding punctuation.
 - Lists: comma-separated on one line.
-- MINIMAL span: answer with the shortest text that fully answers the question. Drop adjectives, qualifiers, and framing the question did not ask for. If asked "what compound/material", give the bare name, not a descriptive phrase around it. If asked for a setting/location/title, give just that token, not the full sentence or formatted heading it appears in.
 
 Examples (good):
   <ANSWER>45</ANSWER>
