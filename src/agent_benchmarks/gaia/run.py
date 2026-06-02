@@ -2,9 +2,11 @@
 GAIA runner for the Lightpanda agent (web-browsing subset).
 
 Loads GAIA from HuggingFace (config `2023_level1`, split `validation`),
-keeps only tasks with no attached file (the pure web-browsing subset),
 invokes `lightpanda agent --task` one-shot per row, and grades answers
-with the normalized exact-match rubric from the GAIA paper.
+with the normalized exact-match rubric from the GAIA paper. Attachments
+are included by default and fed to the model (office docs extracted to
+text, images/audio/PDF inlined via `--attach`); pass `--skip-attachments`
+for the pure web-browsing subset.
 
 The GAIA dataset is gated on HuggingFace — accept the terms at
 https://huggingface.co/datasets/gaia-benchmark/GAIA and set HF_TOKEN.
@@ -140,6 +142,7 @@ Format INSIDE the envelope:
 - Numbers: bare digits — no comma separators, no currency unless asked, no units beyond what's asked.
 - Names/titles: complete and verbatim, no decoration, no surrounding punctuation.
 - Lists: comma-separated on one line.
+- MINIMAL span: answer with the shortest text that fully answers the question. Drop adjectives, qualifiers, and framing the question did not ask for. If asked "what compound/material", give the bare name, not a descriptive phrase around it. If asked for a setting/location/title, give just that token, not the full sentence or formatted heading it appears in.
 
 Examples (good):
   <ANSWER>45</ANSWER>
@@ -179,10 +182,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--skip-attachments",
         action="store_true",
-        help="Skip rows with attached files. Default is to include them, even though "
-        "Lightpanda can't read PDFs/audio/images — skipped tasks score 0 and the full "
-        "Level-N score is what the GAIA paper reports. Use this flag only when you "
-        "want to isolate agent performance on text-only tasks.",
+        help="Skip rows with attached files. Default is to include them: attachments "
+        "are fed to the model (office docs extracted to text, images/audio/PDF inlined "
+        "via --attach), and the full Level-N score is what the GAIA paper reports. Use "
+        "this flag only when you want to isolate agent performance on text-only tasks.",
     )
     args = parser.parse_args(argv)
 
@@ -250,8 +253,8 @@ def main(argv: list[str] | None = None) -> int:
                         file=sys.stderr,
                     )
                     attachment = raw
-        try:
-            pred, duration_s, timed_out, stderr_tail, rc, trace, usage = run_lightpanda_task(
+        def _attempt() -> dict[str, Any]:
+            raw_pred, duration_s, timed_out, stderr_tail, rc, trace, usage = run_lightpanda_task(
                 lightpanda=lightpanda,
                 provider=args.provider,
                 model=args.model,
@@ -261,26 +264,54 @@ def main(argv: list[str] | None = None) -> int:
                 attachment=attachment,
                 timeout_s=args.timeout,
             )
+            pred, envelope_note = extract_answer_envelope(raw_pred)
+            if envelope_note:
+                stderr_tail = (stderr_tail or "") + f"\n[envelope]\n{envelope_note}\n"
+            return {
+                "prediction": pred,
+                "duration_s": duration_s,
+                "timed_out": timed_out,
+                "returncode": rc,
+                "trace": trace,
+                "usage": usage,
+                "stderr_tail": stderr_tail,
+            }
+
+        try:
+            res = _attempt()
+            # An empty answer on a run that did NOT time out is almost always a
+            # transient "(no response from model)" hiccup, not a genuine miss —
+            # retry once. A timeout is a real failure; retrying just burns budget.
+            retried = False
+            refused = "safety refusal" in (res["stderr_tail"] or "")
+            if not (res["prediction"] or "").strip() and not res["timed_out"] and not refused:
+                print(f"  empty answer for {row['task_id']}, retrying once...", file=sys.stderr)
+                retry = _attempt()
+                retried = True
+                # Keep the retry only if it actually produced an answer; otherwise
+                # fall back to the first attempt (its stderr_tail shows the cause),
+                # but bill the wall-clock for both.
+                first_duration = res["duration_s"]
+                res = retry if (retry["prediction"] or "").strip() else res
+                res["duration_s"] += first_duration
         finally:
             if tmp_to_delete is not None:
                 with contextlib.suppress(OSError):
                     tmp_to_delete.unlink()
-        pred, envelope_note = extract_answer_envelope(pred)
-        if envelope_note:
-            stderr_tail = (stderr_tail or "") + f"\n[envelope]\n{envelope_note}\n"
         return {
             "id": row["task_id"],
             "task": row["Question"],
             "gold": row["Final answer"],
-            "prediction": pred,
-            "duration_s": round(duration_s, 2),
-            "timed_out": timed_out,
-            "returncode": rc,
+            "prediction": res["prediction"],
+            "duration_s": round(res["duration_s"], 2),
+            "timed_out": res["timed_out"],
+            "returncode": res["returncode"],
             "level": row.get("Level"),
             "file_name": file_name or None,
-            "trace": trace,
-            "usage": usage,
-            "stderr_tail": stderr_tail,
+            "retried": retried,
+            "trace": res["trace"],
+            "usage": res["usage"],
+            "stderr_tail": res["stderr_tail"],
         }
 
     run_benchmark_tasks(

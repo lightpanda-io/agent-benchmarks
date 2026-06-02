@@ -11,11 +11,16 @@ tasks include attached files (PDF, image, audio). `gaia-run` defaults
 to **Level 1, all tasks** (53 rows in the `validation` split) so the
 score is apples-to-apples with the paper's published Level-1 baseline.
 
-Lightpanda has no PDF/audio/image reader, so tasks with attachments
-(11/53 on Level 1) will score 0 — same as any other text-only browser.
-To isolate agent performance on tasks the stack can *actually* solve,
-pass `--skip-attachments` (runs only the 42 text-only rows). Pass
-`--level 2` or `--level 3` for harder levels.
+11/53 Level-1 tasks ship an attached file. These are **not** dropped or
+auto-scored 0: `gaia-run` feeds each attachment to the model. Office
+docs (`.docx`/`.xlsx`/`.pptx`) are extracted to text locally; images,
+audio, and PDFs are inlined as multimodal parts via the agent's
+`--attach` path (`Agent.zig:buildUserMessageParts`). In practice the
+attachment subset scores *above* the text-only subset (e.g. 10/11 vs
+33/42 on the 2026-05-29 Sonnet 4.6 run) — chess-position PNGs, recipe
+MP3s, and spreadsheets all solve. To measure the pure web-browsing
+subset in isolation, pass `--skip-attachments` (runs only the 42
+text-only rows). Pass `--level 2` or `--level 3` for harder levels.
 
 ## Prerequisites
 
@@ -79,7 +84,7 @@ results/
 
 - `--level {1,2,3}` — default 1
 - `--split {validation,test}` — default `validation`; `test` answers are private
-- `--skip-attachments` — exclude tasks with attached files (default: include, they score 0 to match the paper's baseline scope)
+- `--skip-attachments` — exclude tasks with attached files (default: include; attachments are fed to the model — office docs extracted to text, images/audio/PDF inlined as multimodal parts)
 - `--limit N` — cap the number of tasks
 - `--workers N` — parallel subprocesses (default 1). Be gentle on live sites.
 - `--timeout SECONDS` — per-task timeout (default 300)
