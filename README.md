@@ -26,15 +26,31 @@ own runner, grader, and README.
 
 ## Current results
 
-Lightpanda agent via zenai, default system prompts. Single-run numbers
-captured 2026-05-20 with `gemini-3.5-flash`, 4 workers, 600s
-per-task timeout.
+Lightpanda native agent via zenai (built-in agent loop, prompt-cached,
+talking to the model directly — no MCP). Best run to date: single-run
+numbers captured 2026-06-10 with `claude-sonnet-4-6`, 4 workers, 1800s
+per-task timeout, on a `lightpanda-agent` build with improved tools and a
+faster `goto` (no `networkidle` wait).
 
 | Suite | Split | n | Strict | Notes |
 |---|---|---:|---:|---|
-| AssistantBench | validation | 33 | **63.6%** (soft 55.4%) | Paper's GPT-4 baseline ≈ 25% strict |
-| GAIA Level 1 | validation | 53 | **75.5%** | Paper's GPT-4+tools baseline ≈ 30%. Claude 4.5 Sonnet SOTA ≈ 82% |
-| WebBench (READ) | one-per-site sample | 448 | **25.4%** | LLM judge: `gemini-3.1-pro-preview` over task + final answer + visited URLs. Not a canonical WebBench number (canonical uses HITL or a multimodal judge). |
+| AssistantBench | validation | 33 | **69.7%** (soft 57.1%) | Paper's GPT-4 baseline ≈ 25% strict |
+| GAIA Level 1 | validation | 53 | **83.0%** | Paper's GPT-4+tools baseline ≈ 30%; published Claude Sonnet SOTA ≈ 82% |
+
+Zero timeouts on both. Per-task cost, computed from token counters at
+Sonnet 4.6 rates ($3 / $0.30 / $3.75 / $15 per M for input / cache-read /
+cache-write / output): **GAIA $0.34, AssistantBench $1.94**. This is a
+follow-up to the
+[*Benchmarking Lightpanda for agents*](https://lightpanda.io/blog/posts/benchmarking-lightpanda-for-agents)
+post — see [`agent-benchmarks.md`](agent-benchmarks.md) for the full
+iteration history (`branch → cached → leaner → verify → fastgoto`) and
+the engine/tool-surface comparison.
+
+WebBench (READ), one-per-site sample (448), scored **25.4%** strict in a
+separate 2026-05-20 `gemini-3.5-flash` run (LLM judge:
+`gemini-3.1-pro-preview` over task + final answer + visited URLs — not a
+canonical WebBench number; canonical uses HITL or a multimodal judge). Not
+re-run on Sonnet 4.6.
 
 GAIA Level 1 includes all 11 attachment tasks: PNG/MP3/PY/TXT fed via
 `--attach`; DOCX/XLSX/PPTX extracted to text by the runner first.
@@ -46,8 +62,9 @@ GAIA's exact match; YES from the WebBench LLM judge). Each run writes a
 provider/model and the full launch argv, and graders splat that into
 `scores.json` for provenance.
 
-Reproducing: `uv run <suite>-run --workers <N>` from the browser repo root
-(`--workers 4` recommended to stay under Gemini rate limits).
+Reproducing (native agent, Sonnet 4.6): `uv run <suite>-run --provider
+anthropic --model claude-sonnet-4-6 --lightpanda <lightpanda-agent>
+--workers 4 --timeout 1800` from the browser repo root.
 
 ## Cross-framework comparison: Lightpanda vs agent-browser vs browser-use, Claude+MCP
 
