@@ -16,6 +16,9 @@ headless Chrome. Live-site runs against news.ycombinator.com.
 - **retail** — price monitoring on allbirds.com: collection page → first 3
   product cards (name, color, url) → each product page → price
   (`og:price:amount`) + available sizes (4 page loads, live site).
+- **news** — media monitoring on apnews.com: section page → first 3 article
+  links → each article → headline + first paragraphs (4 page loads, live,
+  ad/tag-heavy).
 - **login_fx** — the same flow against a local fixture
   (`harness/login_fixture.py`) that mimics HN's login markup and selectors.
   Zero network noise, no captcha risk: measures pure driver-stack overhead.
@@ -60,6 +63,10 @@ uv run python harness/bench.py --task scrape_par --mode cold --runs 10 --warmup 
 # retail (live allbirds.com): same rotation scheme
 uv run python harness/bench.py --task retail --mode cold --runs 20 --warmup 2 --pace 3
 uv run python harness/bench.py --task retail --mode warm --runs 20 --warmup 2 --pace 3
+
+# news (live apnews.com): reduced rotations
+uv run python harness/bench.py --task news --mode cold --runs 12 --warmup 2 --pace 3
+uv run python harness/bench.py --task news --mode warm --runs 12 --warmup 2 --pace 3
 
 # login (live HN): throwaway account, ≥45 s between logins (captcha risk), small n
 export LP_HN_USERNAME=... LP_HN_PASSWORD=...

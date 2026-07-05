@@ -41,14 +41,14 @@ CONFIGS = [
     ("playwright-chrome", "playwright", "chrome", 9234),
 ]
 
-TASK_TIMEOUT_S = {"scrape": 180, "scrape_par": 180, "login": 120, "login_fx": 60, "retail": 180}
+TASK_TIMEOUT_S = {"scrape": 180, "scrape_par": 180, "login": 120, "login_fx": 60, "retail": 180, "news": 180}
 
 FIXTURE_PORT = 9280
 
 
 def script_path(driver, task):
     name = {"scrape": "hn_scrape", "scrape_par": "hn_scrape_par",
-            "login": "hn_login", "login_fx": "hn_login_fx", "retail": "retail"}[task]
+            "login": "hn_login", "login_fx": "hn_login_fx", "retail": "retail", "news": "news"}[task]
     return ROOT / "scripts" / driver / f"{name}.js"
 
 
@@ -73,6 +73,12 @@ def validate(task, stdout):
             if not p.get("name") or not isinstance(p.get("price"), (int, float)) \
                     or not isinstance(p.get("sizesAvailable"), list):
                 return f"bad product shape: {json.dumps(p)[:120]}"
+    elif task == "news":
+        if not isinstance(data, list) or len(data) != 3:
+            return f"expected 3 articles, got {data if not isinstance(data, list) else len(data)}"
+        for a in data:
+            if not a.get("headline") or not isinstance(a.get("paragraphs"), list) or not a["paragraphs"]:
+                return f"bad article shape: {json.dumps(a)[:120]}"
     return None
 
 
@@ -174,7 +180,7 @@ def collect_meta(lpd_path, chrome_path, args):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--task", choices=["scrape", "scrape_par", "login", "login_fx", "retail"], required=True)
+    ap.add_argument("--task", choices=["scrape", "scrape_par", "login", "login_fx", "retail", "news"], required=True)
     ap.add_argument("--mode", choices=["cold", "warm"], required=True)
     ap.add_argument("--runs", type=int, default=20, help="measured rotations")
     ap.add_argument("--warmup", type=int, default=2, help="unmeasured warmup rotations")
