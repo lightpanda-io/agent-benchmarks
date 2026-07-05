@@ -1,0 +1,10 @@
+{
+  "name": "pandascript-vs-cdp",
+  "private": true,
+  "type": "module",
+  "description": "Benchmark: PandaScript replay vs Puppeteer/Playwright over CDP (lightpanda serve + headless Chrome)",
+  "dependencies": {
+    "playwright-core": "1.57.0",
+    "puppeteer-core": "24.14.0"
+  }
+}
