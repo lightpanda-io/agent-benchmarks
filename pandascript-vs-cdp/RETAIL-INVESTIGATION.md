@@ -67,12 +67,28 @@ Reproduced in 3 iterations of a driver loop: puppeteer `DOM.resolveNode` → `Un
 
 ## Postscript: cache effect is workload- and path-dependent (2026-07-05)
 
-On the post-#2886 binary, `--http-cache-dir` measured on the light HN scrape (6 pages, few shared assets):
+Full matrix on the post-#2886 binary (`results/pub-*` vs `results/stock-*`, medians; controlled same-rotation probe confirmed the serve-on-HN direction):
 
-- `lightpanda agent`: **helps** — 3.27 s → 2.24 s (pages 2–6 hit cache for shared assets)
-- `lightpanda serve` (puppeteer): **hurts** — 3.66 s → 3.98 s (+~9%)
+| task | agent | serve (pptr/pw) |
+|---|---:|---:|
+| scrape (HN, asset-light) | −29…−31% | **+5…+13% regression** |
+| retail (Shopify) | −10…−12% | −11% |
+| news (ad-heavy) | −38…−41% | −37…−44% |
 
-Same engine, same cache code, same site; the serve-path regression is unexplained (context-scoped cache partitioning? revalidation behavior?) and worth a browser-team look before any enable-by-default decision. Published benchmark tables therefore use stock config as primary, with cache rows shown separately for the retail task.
+Same engine, same cache code: the serve path regresses only on the asset-light site (mostly cache-miss writes, no reuse — but the agent path gains there, so it's not just write overhead; context-scoped partitioning or revalidation behavior?). Worth a browser-team look before any enable-by-default decision. Published benchmark tables use stock config as primary with the full cache matrix as a labeled appendix.
+
+## Postscript 2: supports() fix generality (2026-07-05)
+
+Single-page HAR spot-check on two further modern storefronts (post-#2886 binary vs Chrome 150, same capture script):
+
+| site | engine | requests | js requests | duplicate fetches | worst URL |
+|---|---|---:|---:|---:|---:|
+| gymshark.com | lightpanda | 49 | 20 | 2 | ×2 |
+| gymshark.com | Chrome | 116 | 21 | 6 | ×2 |
+| kitandace.com | lightpanda | 195 | 143 | 35 | ×17 |
+| kitandace.com | Chrome | 274 | 156 | 30 | ×11 |
+
+JS request counts within ~8% of Chrome's on both; duplicate profiles comparable across engines (kitandace's repeated URL repeats on Chrome too — page behavior). No trace of the pre-fix N×-module storm: the fix is platform-level, not Allbirds-specific.
 
 ## Bookkeeping finds for the browser team
 
