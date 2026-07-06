@@ -1,5 +1,7 @@
 # Why lightpanda lost to Chrome on the retail benchmark — investigation
 
+*Companion document to the "PandaScript vs Puppeteer and Playwright" benchmark post. When the first run of the retail task had lightpanda losing to headless Chrome by ~46% warm, this is the investigation that followed — kept public because the numbers only mean something if you can see how we chased them. Harness, scripts, and raw per-run data are in this directory.*
+
 **Date:** 2026-07-04 · **Site:** allbirds.com (Shopify, Vue-based theme) · **Task:** collection page → 3 product pages, extract name/price/sizes (4 loads)
 **Starting point:** puppeteer→Chrome 4.12 s warm vs PandaScript 6.00 s vs CDP-on-lightpanda 6.76 s; gap scales with page weight (~78 ms/page on HN vs ~660 ms/page here). Plus 6/200 CDP-on-lightpanda failures.
 
@@ -97,8 +99,8 @@ JS request counts within ~8% of Chrome's on both; duplicate profiles comparable 
 - `load` gates on **async scripts** draining (`ScriptManager.zig:95`) — Chrome fires `load` without them; inflates time-to-load on tag-heavy pages. Not measured separately here (secondary to the two main causes).
 - `CURLOPT_PIPEWAIT` unset: same-host bursts open up to 6 connections instead of coalescing onto one H2 connection. Not measured (conns A/B suggests small).
 
-## Recommendations (browser team's call)
+## Outcomes
 
-1. **Implement `HTMLScriptElement.supports` + `DOMTokenList.supports`** — ~20 lines total (diagnostic patch on branch `diag/loader-feature-detect`), disproportionate real-world impact: every Vite/Shopify-style loader feature-detects these. Candidates for the same class of issue: `CacheStorage` presence-probe.
-2. **Consider enabling the HTTP cache by default** (or prominently documenting `--http-cache-dir`) — it is worth ~20% on multi-page tasks against real sites, and it's what every other browser does.
-3. The flake reproduces easily with the loop in this repo; see issue (pending).
+1. **`HTMLScriptElement.supports` + `DOMTokenList.supports` implemented and merged** — [lightpanda-io/browser#2886](https://github.com/lightpanda-io/browser/pull/2886) (~20 lines, disproportionate real-world impact: every Vite/Shopify-style loader feature-detects these). Candidate for the same class of issue, still open: a `CacheStorage` presence-probe.
+2. **The CDP flake is resolved by the same fix** — it was theme re-navigation on the legacy loader path (0/50 repro post-fix vs repro-at-3 stock). The suspected residual robustness gap was filed as [#2887](https://github.com/lightpanda-io/browser/issues/2887) and closed after a synthetic repro showed Chrome hard-fails identically on genuine mid-query document replacement.
+3. **HTTP cache by default remains an open engine question** — worth ~10–40% on multi-page tasks against asset-heavy sites (see the cache-matrix postscript), but the measured serve-on-HN regression above argues for understanding that first.
