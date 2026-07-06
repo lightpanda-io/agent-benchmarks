@@ -1,0 +1,11 @@
+{"config": "pandascript", "task": "scrape_par", "mode": "cold", "ms": 1638.9755130221602, "exit": 0, "ok": true, "rotation": 0, "warmup": true, "ts": "2026-07-05T03:09:20.214406+00:00"}
+{"config": "pandascript", "task": "scrape_par", "mode": "cold", "ms": 1479.1150810196996, "exit": 0, "ok": true, "rotation": 1, "warmup": false, "ts": "2026-07-05T03:09:24.694995+00:00"}
+{"config": "pandascript", "task": "scrape_par", "mode": "cold", "ms": 1936.1831279820763, "exit": 0, "ok": true, "rotation": 2, "warmup": false, "ts": "2026-07-05T03:09:29.632892+00:00"}
+{"config": "pandascript", "task": "scrape_par", "mode": "cold", "ms": 1908.6192440008745, "exit": 0, "ok": true, "rotation": 3, "warmup": false, "ts": "2026-07-05T03:09:34.543289+00:00"}
+{"config": "pandascript", "task": "scrape_par", "mode": "cold", "ms": 1715.8669150085188, "exit": 0, "ok": true, "rotation": 4, "warmup": false, "ts": "2026-07-05T03:09:39.261012+00:00"}
+{"config": "pandascript", "task": "scrape_par", "mode": "cold", "ms": 1911.5015210118145, "exit": 0, "ok": true, "rotation": 5, "warmup": false, "ts": "2026-07-05T03:09:44.173931+00:00"}
+{"config": "pandascript", "task": "scrape_par", "mode": "cold", "ms": 1909.678978001466, "exit": 0, "ok": true, "rotation": 6, "warmup": false, "ts": "2026-07-05T03:09:49.084699+00:00"}
+{"config": "pandascript", "task": "scrape_par", "mode": "cold", "ms": 1916.372595995199, "exit": 0, "ok": true, "rotation": 7, "warmup": false, "ts": "2026-07-05T03:09:54.002310+00:00"}
+{"config": "pandascript", "task": "scrape_par", "mode": "cold", "ms": 2016.793703980511, "exit": 0, "ok": true, "rotation": 8, "warmup": false, "ts": "2026-07-05T03:09:59.020303+00:00"}
+{"config": "pandascript", "task": "scrape_par", "mode": "cold", "ms": 1715.738540980965, "exit": 0, "ok": true, "rotation": 9, "warmup": false, "ts": "2026-07-05T03:10:03.737136+00:00"}
+{"config": "pandascript", "task": "scrape_par", "mode": "cold", "ms": 2010.2574400079902, "exit": 0, "ok": true, "rotation": 10, "warmup": false, "ts": "2026-07-05T03:10:08.748509+00:00"}

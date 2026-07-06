@@ -1,0 +1,11 @@
+{"config": "pandascript", "task": "scrape_par", "mode": "cold", "ms": 1763.6458170018159, "exit": 0, "ok": true, "rotation": 0, "warmup": true, "ts": "2026-07-03T20:39:23.943767+00:00"}
+{"config": "pandascript", "task": "scrape_par", "mode": "cold", "ms": 1815.6715590012027, "exit": 0, "ok": true, "rotation": 1, "warmup": false, "ts": "2026-07-03T20:39:28.760462+00:00"}
+{"config": "pandascript", "task": "scrape_par", "mode": "cold", "ms": 1998.20095099858, "exit": 0, "ok": true, "rotation": 2, "warmup": false, "ts": "2026-07-03T20:39:33.759649+00:00"}
+{"config": "pandascript", "task": "scrape_par", "mode": "cold", "ms": 1932.4293399986345, "exit": 0, "ok": true, "rotation": 3, "warmup": false, "ts": "2026-07-03T20:39:38.693057+00:00"}
+{"config": "pandascript", "task": "scrape_par", "mode": "cold", "ms": 1907.339094002964, "exit": 0, "ok": true, "rotation": 4, "warmup": false, "ts": "2026-07-03T20:39:43.601696+00:00"}
+{"config": "pandascript", "task": "scrape_par", "mode": "cold", "ms": 2030.7687029999215, "exit": 0, "ok": true, "rotation": 5, "warmup": false, "ts": "2026-07-03T20:39:48.633190+00:00"}
+{"config": "pandascript", "task": "scrape_par", "mode": "cold", "ms": 2009.5545660005882, "exit": 0, "ok": true, "rotation": 6, "warmup": false, "ts": "2026-07-03T20:39:53.643783+00:00"}
+{"config": "pandascript", "task": "scrape_par", "mode": "cold", "ms": 1859.8875349998707, "exit": 0, "ok": true, "rotation": 7, "warmup": false, "ts": "2026-07-03T20:39:58.504850+00:00"}
+{"config": "pandascript", "task": "scrape_par", "mode": "cold", "ms": 1944.0174409974134, "exit": 0, "ok": true, "rotation": 8, "warmup": false, "ts": "2026-07-03T20:40:03.450009+00:00"}
+{"config": "pandascript", "task": "scrape_par", "mode": "cold", "ms": 1899.8045789994649, "exit": 0, "ok": true, "rotation": 9, "warmup": false, "ts": "2026-07-03T20:40:08.351326+00:00"}
+{"config": "pandascript", "task": "scrape_par", "mode": "cold", "ms": 1948.3825260031153, "exit": 0, "ok": true, "rotation": 10, "warmup": false, "ts": "2026-07-03T20:40:13.300368+00:00"}

@@ -1,0 +1,22 @@
+{
+  "args": {
+    "task": "scrape",
+    "mode": "warm",
+    "runs": 20,
+    "warmup": 2,
+    "pace": 3.0,
+    "configs": null,
+    "out": "results/pub-scrape-warm"
+  },
+  "lpd_cache": true,
+  "lightpanda": "",
+  "chrome": "Google Chrome 150.0.7871.46",
+  "node": "v26.4.0",
+  "npm_deps": {
+    "puppeteer-core": "24.14.0",
+    "playwright-core": "1.57.0"
+  },
+  "kernel": "7.0.14-arch1-1",
+  "cpu_governor": "powersave",
+  "started_utc": "2026-07-05T02:57:36.209227+00:00"
+}
