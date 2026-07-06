@@ -2,7 +2,25 @@
 
 Benchmark: PandaScript replay (`lightpanda agent script.js`) vs the same tasks
 written for Puppeteer and Playwright over CDP, driving `lightpanda serve` and
-headless Chrome. Live-site runs against news.ycombinator.com.
+headless Chrome. Live-site runs against news.ycombinator.com, allbirds.com,
+and apnews.com, plus a local login fixture.
+
+Contents:
+
+- `scripts/` — the benchmarked task scripts, one per driver
+  (pandascript / puppeteer / playwright)
+- `harness/` — `bench.py` (round-robin benchmark orchestrator), `ab.py`
+  (variant A/B runner), `report.py` (aggregation), `plot.py` (figures),
+  `browsers.py` (browser lifecycle), `login_fixture.py` (local login server),
+  `har_capture.js` (HAR capture for request-profile comparisons)
+- `results/` — raw per-run JSONL + meta for every published dataset
+  (`stock-*` = published tables, `pub-*` = `--http-cache-dir` config,
+  `full-*` = investigation runs)
+- `figures/` — per-run distribution plots (regenerate:
+  `uv run --with matplotlib python harness/plot.py stock`)
+- [`RETAIL-INVESTIGATION.md`](RETAIL-INVESTIGATION.md) — why the first retail
+  run lost to Chrome, the investigation, and what came out of it
+  (lightpanda-io/browser#2886, the cache matrix, the CDP-flake resolution)
 
 ## Tasks
 
