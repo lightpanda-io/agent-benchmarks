@@ -12,7 +12,8 @@ Contents:
 - `harness/` — `bench.py` (round-robin benchmark orchestrator), `ab.py`
   (variant A/B runner), `report.py` (aggregation), `plot.py` (figures),
   `browsers.py` (browser lifecycle), `login_fixture.py` (local login server),
-  `har_capture.js` (HAR capture for request-profile comparisons)
+  `har_capture.js` (HAR capture for request-profile comparisons),
+  `memprobe.py` (peak-PSS-over-process-tree memory probe)
 - `results/` — raw per-run JSONL + meta for every published dataset
   (`stock-*` = published tables, `pub-*` = `--http-cache-dir` config,
   `full-*` = investigation runs)
