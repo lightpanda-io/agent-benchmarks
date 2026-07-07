@@ -95,12 +95,33 @@ uv run python harness/bench.py --task login --mode cold --runs 5 --warmup 1 --pa
 uv run python harness/bench.py --task login_fx --mode cold --runs 20 --warmup 2 --pace 1
 uv run python harness/bench.py --task login_fx --mode warm --runs 20 --warmup 2 --pace 1
 
+# memory: peak PSS over each config's full process tree, cold runs
+uv run python harness/memprobe.py --tasks scrape,retail,news,login_fx --iters 5 --pace 5
+
 uv run python harness/report.py results/<dir> [results/<dir> ...]
 ```
 
 Each results dir gets `raw.jsonl` (one line per execution), `meta.json`
 (versions, kernel, CPU governor), and the report prints median/p25/p75/min/max
 plus median browser launch-to-ready for cold runs.
+
+## Reruns and site blocking
+
+Live-site benchmarking from one IP has a finite budget. Two observed failure
+modes, so you recognize them:
+
+- **HN login**: a handful of login attempts in quick succession trips a
+  per-IP reCAPTCHA wall (even `GET /login` then serves the challenge page).
+  That's why login timing uses the local fixture.
+- **Storefront bot protection**: after several days of benchmark campaigns,
+  allbirds.com began serving sub-second empty/challenge pages (0 product
+  cards) to lightpanda-engine traffic specifically, while Chrome configs in
+  the same rotations passed — engine-fingerprint level, not just IP. The
+  validity gate catches it (`expected 3 products, got 0` with sub-second
+  timings, consecutively). It cleared after a few hours of no traffic.
+
+If you see consecutive same-config validity failures with sub-second run
+times, stop the run — the data is garbage and continuing is impolite.
 
 ## Fairness notes
 
