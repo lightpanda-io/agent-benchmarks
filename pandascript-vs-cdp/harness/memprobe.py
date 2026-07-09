@@ -72,14 +72,14 @@ class PeakSampler(threading.Thread):
         self.peak_kb = max(self.peak_kb, pss_of_sessions(self.sids))
 
 
-def run_config(cfg, task, lpd_path, chrome_path, fixture_env):
+def run_config(cfg, task, lpd_path, chrome_path, fixture_env, lpd_flags=()):
     name, driver, engine, port = cfg
     env = {**os.environ, "LIGHTPANDA_DISABLE_TELEMETRY": "true", **fixture_env}
     browser = None
     sids = set()
 
     if driver == "pandascript":
-        cmd = [lpd_path, "agent", str(script_path(driver, task))]
+        cmd = [lpd_path, "agent", *lpd_flags, str(script_path(driver, task))]
     else:
         if engine == "chrome":
             browser = browsers.launch_chrome(chrome_path, port, SCRATCH / f"chrome-mem-{port}")
@@ -89,6 +89,7 @@ def run_config(cfg, task, lpd_path, chrome_path, fixture_env):
         env["BROWSER_WS"] = browser.endpoint
         cmd = ["node", str(script_path(driver, task))]
 
+    t0 = time.perf_counter()
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                             text=True, env=env, start_new_session=True)
     sids.add(session_of(proc.pid))
@@ -99,12 +100,14 @@ def run_config(cfg, task, lpd_path, chrome_path, fixture_env):
     except subprocess.TimeoutExpired:
         proc.kill()
         stdout = ""
+    elapsed = time.perf_counter() - t0
     sampler.stop()
     if browser is not None:
         browser.kill()
 
     err = f"exit {proc.returncode}" if proc.returncode != 0 else validate(task, stdout)
     return {"config": name, "task": task, "peak_pss_mb": sampler.peak_kb / 1024,
+            "elapsed_s": round(elapsed, 3),
             "ok": err is None, **({"error": err} if err else {})}
 
 
@@ -113,6 +116,8 @@ def main():
     ap.add_argument("--tasks", default="scrape,news,login_fx")
     ap.add_argument("--iters", type=int, default=5)
     ap.add_argument("--pace", type=float, default=3.0)
+    ap.add_argument("--configs", default=None, help="comma-separated subset of config names")
+    ap.add_argument("--lpd-flags", default="", help="comma-separated extra flags for lightpanda agent")
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
 
@@ -139,9 +144,12 @@ def main():
                      str(FIXTURE_PORT)],
                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
                 time.sleep(0.5)
+            configs = CONFIGS if not args.configs else \
+                [c for c in CONFIGS if c[0] in args.configs.split(",")]
+            lpd_flags = tuple(f for f in args.lpd_flags.split(",") if f)
             for i in range(args.iters):
-                for cfg in CONFIGS:
-                    rec = run_config(cfg, task, lpd_path, chrome_path, {**fixture_env})
+                for cfg in configs:
+                    rec = run_config(cfg, task, lpd_path, chrome_path, {**fixture_env}, lpd_flags)
                     rec["iter"] = i
                     raw.write(json.dumps(rec) + "\n")
                     raw.flush()

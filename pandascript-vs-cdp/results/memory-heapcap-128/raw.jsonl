@@ -1,0 +1,10 @@
+{"config": "pandascript", "task": "retail", "peak_pss_mb": 127.2822265625, "elapsed_s": 5.991, "ok": true, "iter": 0}
+{"config": "pandascript", "task": "retail", "peak_pss_mb": 125.3623046875, "elapsed_s": 5.896, "ok": true, "iter": 1}
+{"config": "pandascript", "task": "retail", "peak_pss_mb": 129.572265625, "elapsed_s": 5.625, "ok": true, "iter": 2}
+{"config": "pandascript", "task": "retail", "peak_pss_mb": 122.6162109375, "elapsed_s": 5.406, "ok": true, "iter": 3}
+{"config": "pandascript", "task": "retail", "peak_pss_mb": 125.982421875, "elapsed_s": 5.04, "ok": true, "iter": 4}
+{"config": "pandascript", "task": "news", "peak_pss_mb": 92.45703125, "elapsed_s": 5.812, "ok": true, "iter": 0}
+{"config": "pandascript", "task": "news", "peak_pss_mb": 95.509765625, "elapsed_s": 5.929, "ok": true, "iter": 1}
+{"config": "pandascript", "task": "news", "peak_pss_mb": 95.5068359375, "elapsed_s": 5.432, "ok": true, "iter": 2}
+{"config": "pandascript", "task": "news", "peak_pss_mb": 86.8623046875, "elapsed_s": 5.126, "ok": true, "iter": 3}
+{"config": "pandascript", "task": "news", "peak_pss_mb": 81.5517578125, "elapsed_s": 5.738, "ok": true, "iter": 4}
