@@ -96,8 +96,20 @@ JS request counts within ~8% of Chrome's on both; duplicate profiles comparable 
 
 - `--http-timeout` code default is **5000 ms** (`Config.zig:377`) while help text claims 10000 (`help.zon:320`).
 - `.done` wait mode (`Runner.zig:224`) requires no pending macrotask + network idle — unreachable on pages with recurring `setInterval` polling (fetch/MCP default; a timeout trap on analytics-heavy sites).
-- `load` gates on **async scripts** draining (`ScriptManager.zig:95`) — Chrome fires `load` without them; inflates time-to-load on tag-heavy pages. Not measured separately here (secondary to the two main causes).
+- ~~`load` gates on async scripts — Chrome fires `load` without them~~ **Retested and refuted** (2026-07: `harness/load_semantics_fixture.py`, 4×300 ms scripts): Chrome delays `load` on async/defer/dynamic scripts exactly as lightpanda does, and both engines fetch them in one parallel round (~300 ms). Load-event semantics match; not a gap.
+- ~~Classic parser-blocking `<script src>` fetched serially, no preload scanner~~ **Retested and refuted on current main** (same fixture): 4×300 ms blocking scripts complete in ~304 ms on lightpanda vs ~312 ms on Chrome — parallel on both. Fixed by engine work since this document's original date.
 - `CURLOPT_PIPEWAIT` unset: same-host bursts open up to 6 connections instead of coalescing onto one H2 connection. Not measured (conns A/B suggests small).
+
+## Postscript 3: the serve-path cache regression, reproduced offline (2026-07)
+
+The serve-on-HN cache regression (Postscript 1) now has a 30-second offline repro with a much larger effect size — `harness/load_semantics_fixture.py` serves a 6-page site where every page includes the same 3 cacheable scripts (`Cache-Control: max-age=3600`, 30 ms server delay each). Walking all 6 pages, same binary, medians of 3:
+
+| path | no cache | `--http-cache-dir` |
+|---|---:|---:|
+| `lightpanda agent` | 237–245 ms | **80–96 ms** (cache works: ~3× faster) |
+| puppeteer → `lightpanda serve` | 207 ms | **1,060–1,226 ms** (5–6× slower) |
+
+On the serve path, cache **hits are slower than misses** (warm-cache trials are the slowest), adding ~170 ms per page on localhost — consistent with a per-response wait on something cache-served responses never deliver (e.g. a network-event/timeout interaction in the CDP layer), not with cache I/O cost. This is the blocker for enabling the cache by default: the agent path already wins everywhere with it, and stock-vs-Chrome's only remaining warm losses flip once the cache is on.
 
 ## Outcomes
 
