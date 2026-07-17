@@ -154,10 +154,15 @@ def collect_meta(lpd_path, chrome_path, args):
         except Exception as e:
             return f"error: {e}"
 
-    governor = "?"
-    gov_path = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
-    if os.path.exists(gov_path):
-        governor = open(gov_path).read().strip()
+    def sysfs(path):
+        try:
+            return open(path).read().strip()
+        except OSError:
+            return "?"
+
+    governor = sysfs("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor")
+    epp = sysfs("/sys/devices/system/cpu/cpu0/cpufreq/energy_performance_preference")
+    platform_profile = sysfs("/sys/firmware/acpi/platform_profile")
 
     npm_versions = {}
     for pkg in ("puppeteer-core", "playwright-core"):
@@ -174,6 +179,8 @@ def collect_meta(lpd_path, chrome_path, args):
         "npm_deps": npm_versions,
         "kernel": platform.release(),
         "cpu_governor": governor,
+        "cpu_epp": epp,
+        "platform_profile": platform_profile,
         "started_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
     }
 
@@ -229,6 +236,7 @@ def main():
                 held[name] = launch_browser(engine, port, lpd_path, chrome_path)
 
     raw = open(out_dir / "raw.jsonl", "a")
+    consecutive_fails = {}
     try:
         total = args.warmup + args.runs
         for rotation in range(total):
@@ -249,6 +257,13 @@ def main():
                 print(f"[{label}] {cfg[0]}: {rec.get('ms', 0):.0f} ms {status}", flush=True)
                 if rec.get("captcha"):
                     sys.exit("ABORT: captcha detected — stopping to avoid poisoning the account/IP")
+                # Site-block guard: isolated failures are live-site noise, but a
+                # config failing repeatedly in a row means the site is refusing
+                # us — stop rather than hammer through (see README).
+                name = cfg[0]
+                consecutive_fails[name] = 0 if rec["ok"] else consecutive_fails.get(name, 0) + 1
+                if consecutive_fails[name] >= 3:
+                    sys.exit(f"ABORT: {name} failed 3 consecutive rotations — likely site block")
                 time.sleep(args.pace)
     finally:
         raw.close()
