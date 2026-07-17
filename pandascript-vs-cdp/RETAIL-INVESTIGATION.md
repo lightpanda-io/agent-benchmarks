@@ -102,12 +102,12 @@ JS request counts within ~8% of Chrome's on both; duplicate profiles comparable 
 
 ## Postscript 3: the serve-path cache regression, reproduced offline (2026-07)
 
-The serve-on-HN cache regression (Postscript 1) now has a 30-second offline repro with a much larger effect size — `harness/load_semantics_fixture.py` serves a 6-page site where every page includes the same 3 cacheable scripts (`Cache-Control: max-age=3600`, 30 ms server delay each). Walking all 6 pages, same binary, medians of 3:
+The serve-on-HN cache regression (Postscript 1) now has a 30-second offline repro with a much larger effect size — see **[`repro-serve-cache/`](repro-serve-cache/)** (one command, fully offline). The fixture serves a 6-page site where every page includes the same 3 cacheable scripts (`Cache-Control: max-age=3600`, 30 ms server delay each). Walking all 6 pages, same binary (1.0.0-dev.8162+a59abc7f), 3 trials per cell, cache dir persisting across trials (trial 1 = cold cache, 2–3 = warm), elapsed measured inside the walk:
 
 | path | no cache | `--http-cache-dir` |
 |---|---:|---:|
-| `lightpanda agent` | 237–245 ms | **80–96 ms** (cache works: ~3× faster) |
-| puppeteer → `lightpanda serve` | 207 ms | **1,060–1,226 ms** (5–6× slower) |
+| `lightpanda agent` | 201–206 ms | **12–45 ms** (cache works: warm hits ~17× faster) |
+| puppeteer → `lightpanda serve` | 210–212 ms | **1,059–1,228 ms** (~6× slower) |
 
 On the serve path, cache **hits are slower than misses** (warm-cache trials are the slowest), adding ~170 ms per page on localhost — consistent with a per-response wait on something cache-served responses never deliver (e.g. a network-event/timeout interaction in the CDP layer), not with cache I/O cost. This is the blocker for enabling the cache by default: the agent path already wins everywhere with it, and stock-vs-Chrome's only remaining warm losses flip once the cache is on.
 
