@@ -9,26 +9,25 @@ const browser = await puppeteer.connect(
 const context = await browser.createBrowserContext();
 const page = await context.newPage();
 
-await page.goto("https://www.allbirds.com/collections/mens-shoes");
+await page.goto("https://eu.gymshark.com/es-ES/collections/all-products/mens");
 
-const products = await page.$$eval("[data-product-card]", (cards) =>
+const products = await page.$$eval("[class*='product-card_card-wrapper']", (cards) =>
   cards.slice(0, 3).map((card) => ({
-    name: card.getAttribute("data-product-name"),
-    color: card.getAttribute("data-product-color"),
+    name: card.querySelector("[class*='product-card_title'] a")?.textContent.trim(),
     url: card.querySelector("a[href*='/products/']")?.href ?? "",
   })),
 );
 
 for (const product of products) {
   await page.goto(product.url);
-  await page.waitForSelector("[data-testid^=pdp-size-selector-button]");
-  product.price = parseFloat(await page.$eval(
-    "meta[property='og:price:amount']",
-    (meta) => meta.content,
-  ));
+  await page.waitForSelector("fieldset[class*='add-to-cart_sizes']");
+  product.price = parseFloat((await page.$eval(
+    "[class*='product-information_price']",
+    (el) => el.textContent,
+  )).replace(",", "."));
   product.sizesAvailable = await page.$$eval(
-    "[data-testid=pdp-size-selector-button-available]",
-    (buttons) => buttons.map((b) => b.textContent.trim()),
+    "fieldset[class*='add-to-cart_sizes'] label[class*='size_size']",
+    (labels) => labels.map((l) => l.textContent.trim()),
   );
 }
 

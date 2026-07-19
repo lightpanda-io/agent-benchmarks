@@ -1,13 +1,12 @@
 const page = new Page();
-await page.goto("https://www.allbirds.com/collections/mens-shoes");
+await page.goto("https://eu.gymshark.com/es-ES/collections/all-products/mens");
 
 const { products } = page.extract({
   products: [{
-    selector: "[data-product-card]",
+    selector: "[class*='product-card_card-wrapper']",
     limit: 3,
     fields: {
-      name: { selector: "", attr: "data-product-name" },
-      color: { selector: "", attr: "data-product-color" },
+      name: { selector: "[class*='product-card_title'] a" },
       url: { selector: "a[href*='/products/']", attr: "href" }
     }
   }]
@@ -15,12 +14,12 @@ const { products } = page.extract({
 
 for (const product of products) {
   await page.goto(product.url);
-  page.waitForSelector("[data-testid^=pdp-size-selector-button]");
+  page.waitForSelector("fieldset[class*='add-to-cart_sizes']");
   const details = page.extract({
-    price: { selector: "meta[property='og:price:amount']", attr: "content" },
-    sizes: ["[data-testid=pdp-size-selector-button-available]"]
+    price: { selector: "[class*='product-information_price']" },
+    sizes: ["fieldset[class*='add-to-cart_sizes'] label[class*='size_size']"]
   });
-  product.price = parseFloat(details.price);
+  product.price = parseFloat(details.price.replace(",", "."));
   product.sizesAvailable = details.sizes;
 }
 
