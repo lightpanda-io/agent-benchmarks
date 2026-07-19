@@ -2,7 +2,8 @@
 
 Benchmark: PandaScript replay (`lightpanda agent script.js`) vs the same tasks
 written for Puppeteer and Playwright over CDP, driving `lightpanda serve` and
-headless Chrome. Live-site runs against news.ycombinator.com, allbirds.com,
+headless Chrome. Live-site runs against news.ycombinator.com, gymshark.com
+(allbirds.com in the original dataset — see "Reruns and site blocking"),
 and apnews.com, plus a local login fixture.
 
 Contents:
@@ -32,9 +33,11 @@ Contents:
   profile page. Needs a throwaway account. Caution: benchmark-frequency logins
   trip HN's "Validation required" captcha per IP; once tripped, even GET /login
   serves the validation page for a while.
-- **retail** — price monitoring on allbirds.com: collection page → first 3
-  product cards (name, color, url) → each product page → price
-  (`og:price:amount`) + available sizes (4 page loads, live site).
+- **retail** — price monitoring on a live storefront: collection page →
+  first 3 product cards (name, url) → each product page → price + sizes
+  (4 page loads, live site). Originally allbirds.com (`results/stock-*`,
+  `results/pub-*`); ported to eu.gymshark.com for `results/v2-*` after
+  allbirds began blocking lightpanda-fingerprinted traffic from our IP.
 - **news** — media monitoring on apnews.com: section page → first 3 article
   links → each article → headline + first paragraphs (4 page loads, live,
   ad/tag-heavy).
@@ -79,7 +82,7 @@ uv run python harness/bench.py --task scrape --mode cold --runs 20 --warmup 2 --
 uv run python harness/bench.py --task scrape --mode warm --runs 20 --warmup 2 --pace 3
 uv run python harness/bench.py --task scrape_par --mode cold --runs 10 --warmup 1 --pace 3
 
-# retail (live allbirds.com): same rotation scheme
+# retail (live storefront): same rotation scheme
 uv run python harness/bench.py --task retail --mode cold --runs 20 --warmup 2 --pace 3
 uv run python harness/bench.py --task retail --mode warm --runs 20 --warmup 2 --pace 3
 
