@@ -32,7 +32,7 @@ ROWS = [
 
 TASKS = {
     "scrape": "Hacker News scrape — 6 page loads, live site",
-    "retail": "Retail price monitoring (allbirds.com) — 4 page loads, live site",
+    "retail": "Retail price monitoring (gymshark.com) — 4 page loads, live site",
     "news": "News monitoring (apnews.com) — 4 page loads, live site",
 }
 
@@ -48,13 +48,22 @@ matplotlib.rcParams.update({
 
 
 def load(task, mode, prefix):
-    path = ROOT / "results" / f"{prefix}-{task}-{mode}" / "raw.jsonl"
-    runs = {}
-    for line in path.read_text().splitlines():
-        r = json.loads(line)
-        if r.get("warmup") or not r.get("ok"):
-            continue
-        runs.setdefault(r["config"], []).append(r["ms"] / 1000.0)
+    def read(path):
+        runs = {}
+        for line in path.read_text().splitlines():
+            r = json.loads(line)
+            if r.get("warmup") or not r.get("ok"):
+                continue
+            runs.setdefault(r["config"], []).append(r["ms"] / 1000.0)
+        return runs
+
+    runs = read(ROOT / "results" / f"{prefix}-{task}-{mode}" / "raw.jsonl")
+    # Warm-mode pandascript rows come from the -agentcache supplement when it
+    # exists (persistent per-session cache dir — the warm-state analogue of a
+    # held browser; same source as the published tables).
+    supplement = ROOT / "results" / f"{prefix}-{task}-{mode}-agentcache" / "raw.jsonl"
+    if mode == "warm" and supplement.exists():
+        runs["pandascript"] = read(supplement)["pandascript"]
     return runs
 
 
