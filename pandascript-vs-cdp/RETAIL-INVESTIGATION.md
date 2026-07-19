@@ -1,6 +1,6 @@
 # Why lightpanda lost to Chrome on the retail benchmark — investigation
 
-*Companion document to the "PandaScript vs Puppeteer and Playwright" benchmark post. When the first run of the retail task had lightpanda losing to headless Chrome by ~46% warm, this is the investigation that followed — kept public because the numbers only mean something if you can see how we chased them. Harness, scripts, and raw per-run data are in this directory.*
+*Companion document to the "PandaScript vs Puppeteer and Playwright" benchmark post. When the first run of the retail task had lightpanda losing to headless Chrome by ~46% warm, this is the investigation that followed — kept public because the numbers only mean something if you can see how we chased them. Harness and scripts are in this directory; the working tree keeps only the published dataset (`results/v3-*`), so the historical result directories this document cites (`stock-*`, `pub-*`, `full-ab-*`, `v2-*`) live in git history.*
 
 **Date:** 2026-07-04 · **Site:** allbirds.com (Shopify, Vue-based theme) · **Task:** collection page → 3 product pages, extract name/price/sizes (4 loads)
 **Starting point:** puppeteer→Chrome 4.12 s warm vs PandaScript 6.00 s vs CDP-on-lightpanda 6.76 s; gap scales with page weight (~78 ms/page on HN vs ~660 ms/page here). Plus 6/200 CDP-on-lightpanda failures.

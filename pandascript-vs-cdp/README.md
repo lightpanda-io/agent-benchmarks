@@ -15,11 +15,15 @@ Contents:
   `browsers.py` (browser lifecycle), `login_fixture.py` (local login server),
   `har_capture.js` (HAR capture for request-profile comparisons),
   `memprobe.py` (peak-PSS-over-process-tree memory probe)
-- `results/` — raw per-run JSONL + meta for every published dataset
-  (`stock-*` = published tables, `pub-*` = `--http-cache-dir` config,
-  `full-*` = investigation runs)
+- `results/` — raw per-run JSONL + meta for the published dataset:
+  `v3-*` = the post's timing tables (`-warm-agentcache` = pandascript warm
+  runs with the persistent per-session cache dir), `memory` = the peak-PSS
+  probe. Superseded datasets (the original stock-config tables, the cache
+  A/B matrix, investigation runs, and the balanced-power-profile `v2-*`
+  rerun) live in git history — see `RETAIL-INVESTIGATION.md` for what they
+  established.
 - `figures/` — per-run distribution plots (regenerate:
-  `uv run --with matplotlib python harness/plot.py stock`)
+  `uv run --with matplotlib python harness/plot.py v3`)
 - [`RETAIL-INVESTIGATION.md`](RETAIL-INVESTIGATION.md) — why the first retail
   run lost to Chrome, the investigation, and what came out of it
   (lightpanda-io/browser#2886, the cache matrix, the CDP-flake resolution)
@@ -35,9 +39,9 @@ Contents:
   serves the validation page for a while.
 - **retail** — price monitoring on a live storefront: collection page →
   first 3 product cards (name, url) → each product page → price + sizes
-  (4 page loads, live site). Originally allbirds.com (`results/stock-*`,
-  `results/pub-*`); ported to eu.gymshark.com for `results/v2-*` after
-  allbirds began blocking lightpanda-fingerprinted traffic from our IP.
+  (4 page loads, live site). Originally allbirds.com (datasets in git
+  history); ported to eu.gymshark.com after allbirds began blocking
+  lightpanda-fingerprinted traffic from our IP.
 - **news** — media monitoring on apnews.com: section page → first 3 article
   links → each article → headline + first paragraphs (4 page loads, live,
   ad/tag-heavy).
@@ -76,19 +80,26 @@ cd ../benchmarks/pandascript-vs-cdp
 npm ci
 
 export LPD_PATH=$(realpath ../../browser/zig-out/bin/lightpanda)
+export LPD_CACHE=1   # published config: --http-cache-dir on the lightpanda side
+                     # (fresh dir per browser/process; pandascript warm keeps it
+                     # for the session — see lpd_cache_flags in bench.py)
 
-# scrape: 2 warmup + 20 measured rotations, 3 s pacing
-uv run python harness/bench.py --task scrape --mode cold --runs 20 --warmup 2 --pace 3
-uv run python harness/bench.py --task scrape --mode warm --runs 20 --warmup 2 --pace 3
-uv run python harness/bench.py --task scrape_par --mode cold --runs 10 --warmup 1 --pace 3
+# scrape: 2 warmup + 12 measured rotations, 3 s pacing
+uv run python harness/bench.py --task scrape --mode cold --runs 12 --warmup 2 --pace 3
+uv run python harness/bench.py --task scrape --mode warm --runs 12 --warmup 2 --pace 3
+uv run python harness/bench.py --task scrape_par --mode cold --configs pandascript --runs 12 --warmup 2 --pace 3
 
 # retail (live storefront): same rotation scheme
-uv run python harness/bench.py --task retail --mode cold --runs 20 --warmup 2 --pace 3
-uv run python harness/bench.py --task retail --mode warm --runs 20 --warmup 2 --pace 3
+uv run python harness/bench.py --task retail --mode cold --runs 12 --warmup 2 --pace 3
+uv run python harness/bench.py --task retail --mode warm --runs 12 --warmup 2 --pace 3
 
-# news (live apnews.com): reduced rotations
+# news (live apnews.com): same rotation scheme
 uv run python harness/bench.py --task news --mode cold --runs 12 --warmup 2 --pace 3
 uv run python harness/bench.py --task news --mode warm --runs 12 --warmup 2 --pace 3
+
+# pandascript warm supplement (persistent per-session cache dir — the
+# warm-state analogue of a held browser; the post's warm pandascript rows)
+uv run python harness/bench.py --task scrape --mode warm --configs pandascript --runs 12 --warmup 2 --pace 3
 
 # login (live HN): throwaway account, ≥45 s between logins (captcha risk), small n
 export LP_HN_USERNAME=... LP_HN_PASSWORD=...
