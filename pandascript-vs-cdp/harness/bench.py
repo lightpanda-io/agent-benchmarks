@@ -274,9 +274,17 @@ def main():
                 # config failing repeatedly in a row means the site is refusing
                 # us — stop rather than hammer through (see README).
                 name = cfg[0]
-                consecutive_fails[name] = 0 if rec["ok"] else consecutive_fails.get(name, 0) + 1
-                if consecutive_fails[name] >= 3:
-                    sys.exit(f"ABORT: {name} failed 3 consecutive rotations — likely site block")
+                if rec["ok"]:
+                    consecutive_fails[name] = 0
+                else:
+                    # A site block manifests as clean-exit runs failing the
+                    # content gate; a driver crash (exit N, e.g. the #2994
+                    # handle race) doesn't mean the site is refusing us, so
+                    # it gets a higher bar before we stop.
+                    consecutive_fails[name] = consecutive_fails.get(name, 0) + 1
+                    limit = 6 if (rec.get("error") or "").startswith("exit ") else 3
+                    if consecutive_fails[name] >= limit:
+                        sys.exit(f"ABORT: {name} failed {limit} consecutive rotations — likely site block")
                 time.sleep(args.pace)
     finally:
         raw.close()
