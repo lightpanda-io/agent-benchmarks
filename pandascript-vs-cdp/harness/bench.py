@@ -82,16 +82,26 @@ def validate(task, stdout):
     return None
 
 
-def lpd_cache_flags(tag):
+def lpd_cache_flags(tag, persist=False):
     """Fresh --http-cache-dir per browser/process lifetime. Within-run caching
     only — the fair analogue of Chrome's always-on cache (stricter, in fact:
-    Chrome's pre-created profile persists its cache across cold runs)."""
+    Chrome's pre-created profile persists its cache across cold runs).
+
+    persist=True keeps the dir across runs within the session (wiped once, on
+    first use): warm-mode state for a process-per-run driver, mirroring what a
+    held browser keeps between runs."""
     if not os.environ.get("LPD_CACHE"):
         return []
     d = SCRATCH / f"lpd-cache-{tag}"
-    shutil.rmtree(d, ignore_errors=True)
-    d.mkdir(parents=True)
+    if not (persist and d in _persisted_cache_dirs):
+        shutil.rmtree(d, ignore_errors=True)
+        d.mkdir(parents=True)
+    if persist:
+        _persisted_cache_dirs.add(d)
     return ["--http-cache-dir", str(d)]
+
+
+_persisted_cache_dirs = set()
 
 
 def launch_browser(engine, port, lpd_path, chrome_path):
@@ -111,7 +121,8 @@ def run_once(cfg, task, mode, lpd_path, chrome_path, held_browsers):
     rec = {"config": name, "task": task, "mode": mode}
 
     if driver == "pandascript":
-        cmd = [lpd_path, "agent", *lpd_cache_flags("agent"), str(script_path(driver, task))]
+        cmd = [lpd_path, "agent", *lpd_cache_flags("agent", persist=(mode == "warm")),
+               str(script_path(driver, task))]
         t0 = time.perf_counter()
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env)
         rec["ms"] = (time.perf_counter() - t0) * 1000
@@ -136,7 +147,8 @@ def run_once(cfg, task, mode, lpd_path, chrome_path, held_browsers):
     rec["exit"] = proc.returncode
     err = None
     if proc.returncode != 0:
-        err = f"exit {proc.returncode}: {proc.stderr[-300:]}"
+        err = f"exit {proc.returncode}: {proc.stderr[:400]} [...] {proc.stderr[-300:]}" \
+            if len(proc.stderr) > 700 else f"exit {proc.returncode}: {proc.stderr}"
     else:
         err = validate(task, proc.stdout)
     rec["ok"] = err is None
@@ -173,6 +185,7 @@ def collect_meta(lpd_path, chrome_path, args):
     return {
         "args": vars(args),
         "lpd_cache": bool(os.environ.get("LPD_CACHE")),
+        "agent_warm_cache": "persistent-per-session",
         "lightpanda": out([lpd_path, "--version"]),
         "chrome": out([chrome_path, "--version"]),
         "node": out(["node", "--version"]),
