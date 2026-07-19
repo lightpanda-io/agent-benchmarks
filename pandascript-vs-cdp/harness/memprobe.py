@@ -23,7 +23,7 @@ import time
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 import browsers
-from bench import CONFIGS, FIXTURE_PORT, TASK_TIMEOUT_S, script_path, validate
+from bench import CONFIGS, FIXTURE_PORT, TASK_TIMEOUT_S, lpd_cache_flags, script_path, validate
 
 ROOT = pathlib.Path(__file__).parent.parent
 SCRATCH = pathlib.Path(os.environ.get("BENCH_SCRATCH", "/tmp")) / "pandascript-vs-cdp"
@@ -79,12 +79,13 @@ def run_config(cfg, task, lpd_path, chrome_path, fixture_env, lpd_flags=()):
     sids = set()
 
     if driver == "pandascript":
-        cmd = [lpd_path, "agent", *lpd_flags, str(script_path(driver, task))]
+        cmd = [lpd_path, "agent", *lpd_cache_flags("mem-agent"), *lpd_flags,
+               str(script_path(driver, task))]
     else:
         if engine == "chrome":
             browser = browsers.launch_chrome(chrome_path, port, SCRATCH / f"chrome-mem-{port}")
         else:
-            browser = browsers.launch_lightpanda(lpd_path, port)
+            browser = browsers.launch_lightpanda(lpd_path, port, lpd_cache_flags(f"mem-serve-{port}"))
         sids.add(session_of(browser.proc.pid))
         env["BROWSER_WS"] = browser.endpoint
         cmd = ["node", str(script_path(driver, task))]
