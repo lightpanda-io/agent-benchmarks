@@ -1,0 +1,25 @@
+{
+  "args": {
+    "task": "login_fx",
+    "mode": "warm",
+    "runs": 12,
+    "warmup": 2,
+    "pace": 3.0,
+    "configs": null,
+    "out": "results/v4-login_fx-warm"
+  },
+  "lpd_cache": true,
+  "agent_warm_cache": "persistent-per-session",
+  "lightpanda": "",
+  "chrome": "Google Chrome 150.0.7871.128",
+  "node": "v26.4.0",
+  "npm_deps": {
+    "puppeteer-core": "24.14.0",
+    "playwright-core": "1.57.0"
+  },
+  "kernel": "7.1.4-arch1-1",
+  "cpu_governor": "powersave",
+  "cpu_epp": "performance",
+  "platform_profile": "performance",
+  "started_utc": "2026-07-21T12:39:31.647234+00:00"
+}
