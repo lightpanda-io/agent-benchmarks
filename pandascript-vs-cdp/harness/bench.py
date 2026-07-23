@@ -35,6 +35,9 @@ SCRATCH = pathlib.Path(os.environ.get("BENCH_SCRATCH", "/tmp")) / "pandascript-v
 CONFIGS = [
     # (name, driver, engine, base CDP port)
     ("pandascript", "pandascript", "lightpanda", None),
+    # Same replay but never persists the cache dir in warm mode — for
+    # anchored A/Bs of the warm-cache convention on unstable sites.
+    ("pandascript-fresh", "pandascript", "lightpanda", None),
     ("puppeteer-lightpanda", "puppeteer", "lightpanda", 9231),
     ("puppeteer-chrome", "puppeteer", "chrome", 9232),
     ("playwright-lightpanda", "playwright", "lightpanda", 9233),
@@ -121,7 +124,8 @@ def run_once(cfg, task, mode, lpd_path, chrome_path, held_browsers):
     rec = {"config": name, "task": task, "mode": mode}
 
     if driver == "pandascript":
-        cmd = [lpd_path, "agent", *lpd_cache_flags("agent", persist=(mode == "warm")),
+        persist = mode == "warm" and name != "pandascript-fresh"
+        cmd = [lpd_path, "agent", *lpd_cache_flags(name, persist=persist),
                str(script_path(driver, task))]
         t0 = time.perf_counter()
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env)
