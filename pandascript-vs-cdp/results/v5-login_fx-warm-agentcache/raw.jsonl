@@ -1,0 +1,14 @@
+{"config": "pandascript", "task": "login_fx", "mode": "warm", "ms": 59.98696899951028, "exit": 0, "ok": true, "rotation": 0, "warmup": true, "ts": "2026-07-23T08:31:47.257719+00:00"}
+{"config": "pandascript", "task": "login_fx", "mode": "warm", "ms": 44.87233600048057, "exit": 0, "ok": true, "rotation": 1, "warmup": true, "ts": "2026-07-23T08:31:50.303156+00:00"}
+{"config": "pandascript", "task": "login_fx", "mode": "warm", "ms": 46.29680299967731, "exit": 0, "ok": true, "rotation": 2, "warmup": false, "ts": "2026-07-23T08:31:53.350002+00:00"}
+{"config": "pandascript", "task": "login_fx", "mode": "warm", "ms": 62.049920999925234, "exit": 0, "ok": true, "rotation": 3, "warmup": false, "ts": "2026-07-23T08:31:56.412438+00:00"}
+{"config": "pandascript", "task": "login_fx", "mode": "warm", "ms": 55.343702000755, "exit": 0, "ok": true, "rotation": 4, "warmup": false, "ts": "2026-07-23T08:31:59.468055+00:00"}
+{"config": "pandascript", "task": "login_fx", "mode": "warm", "ms": 45.41478200007987, "exit": 0, "ok": true, "rotation": 5, "warmup": false, "ts": "2026-07-23T08:32:02.514012+00:00"}
+{"config": "pandascript", "task": "login_fx", "mode": "warm", "ms": 46.77284799981862, "exit": 0, "ok": true, "rotation": 6, "warmup": false, "ts": "2026-07-23T08:32:05.561349+00:00"}
+{"config": "pandascript", "task": "login_fx", "mode": "warm", "ms": 44.78058000040619, "exit": 0, "ok": true, "rotation": 7, "warmup": false, "ts": "2026-07-23T08:32:08.606636+00:00"}
+{"config": "pandascript", "task": "login_fx", "mode": "warm", "ms": 47.93495400008396, "exit": 0, "ok": true, "rotation": 8, "warmup": false, "ts": "2026-07-23T08:32:11.655140+00:00"}
+{"config": "pandascript", "task": "login_fx", "mode": "warm", "ms": 60.51564599965786, "exit": 0, "ok": true, "rotation": 9, "warmup": false, "ts": "2026-07-23T08:32:14.716139+00:00"}
+{"config": "pandascript", "task": "login_fx", "mode": "warm", "ms": 46.29666299933888, "exit": 0, "ok": true, "rotation": 10, "warmup": false, "ts": "2026-07-23T08:32:17.762804+00:00"}
+{"config": "pandascript", "task": "login_fx", "mode": "warm", "ms": 45.539241999904334, "exit": 0, "ok": true, "rotation": 11, "warmup": false, "ts": "2026-07-23T08:32:20.808754+00:00"}
+{"config": "pandascript", "task": "login_fx", "mode": "warm", "ms": 43.6106449997169, "exit": 0, "ok": true, "rotation": 12, "warmup": false, "ts": "2026-07-23T08:32:23.852899+00:00"}
+{"config": "pandascript", "task": "login_fx", "mode": "warm", "ms": 45.48221999993984, "exit": 0, "ok": true, "rotation": 13, "warmup": false, "ts": "2026-07-23T08:32:26.898895+00:00"}
