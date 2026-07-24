@@ -9,7 +9,7 @@ and apnews.com, plus a local login fixture.
 Contents:
 
 - `scripts/` — the benchmarked task scripts, one per driver
-  (pandascript / puppeteer / playwright)
+  (pandascript / puppeteer / playwright / playwright-py / lightpanda-py)
 - `harness/` — `bench.py` (round-robin benchmark orchestrator), `ab.py`
   (variant A/B runner), `report.py` (aggregation), `plot.py` (figures),
   `browsers.py` (browser lifecycle), `login_fixture.py` (local login server),
@@ -54,10 +54,29 @@ Contents:
 ## Configurations
 
 `pandascript`, `puppeteer-lightpanda`, `puppeteer-chrome`,
-`playwright-lightpanda`, `playwright-chrome`. CDP scripts *connect* to a
+`playwright-lightpanda`, `playwright-chrome`, `playwright-py-lightpanda`,
+`playwright-py-chrome`, `lightpanda-py`. CDP scripts *connect* to a
 browser the harness launched (`BROWSER_WS` env: `ws://` for lightpanda,
 `http://` for Chrome); the harness owns the browser lifecycle so cold timing
 can bracket it.
+
+The two Python legs (deps: `uv sync --group psbench` in the repo root):
+
+- **playwright-py-\*** — Playwright for Python (pinned to the same minor as
+  the Node `playwright-core` dep), line-for-line ports of the Node scripts,
+  run as `python script.py` against the same harness-launched browsers.
+  Same cold/warm semantics as the Node CDP legs; pays Python interpreter
+  startup where Node legs pay `node` startup.
+- **lightpanda-py** — the lightpanda Python bindings
+  (`browser/bindings/python`): `Browser()` spawns its own `lightpanda mcp`
+  sidecar and drives it over MCP HTTP, so like pandascript there is no
+  harness-launched engine and cold timing covers the whole
+  `python script.py` (interpreter + sidecar spawn + task). Cache flags reach
+  the sidecar via `BENCH_LPD_ARGS` → `Browser(args=...)`; the binary comes
+  from `LIGHTPANDA_BIN=$LPD_PATH`. The memory probe's session-id PSS sum
+  covers interpreter + sidecar together. There is **no `scrape_par`
+  variant**: the MCP server dispatches one request at a time, so a parallel
+  port would not actually run its page loads concurrently.
 
 ## Modes
 
@@ -145,3 +164,8 @@ times, stop the run — the data is garbage and continuing is impolite.
   anywhere (symmetric).
 - `LIGHTPANDA_DISABLE_TELEMETRY=true` on every lightpanda invocation.
 - Distinct ports per CDP config in warm mode so held instances share nothing.
+- Python legs include the interpreter in both wall time and PSS, exactly as
+  the Node legs include `node`'s — symmetric per-stack overhead, not noise.
+- `lightpanda-py` cold includes its sidecar spawn because that *is* its cold
+  path; comparing it to CDP-leg cold (browser launch included) is
+  like-for-like.

@@ -42,6 +42,11 @@ CONFIGS = [
     ("puppeteer-chrome", "puppeteer", "chrome", 9232),
     ("playwright-lightpanda", "playwright", "lightpanda", 9233),
     ("playwright-chrome", "playwright", "chrome", 9234),
+    ("playwright-py-lightpanda", "playwright-py", "lightpanda", 9235),
+    ("playwright-py-chrome", "playwright-py", "chrome", 9236),
+    # Python bindings: the script's Browser() spawns its own `lightpanda mcp`
+    # sidecar, so like pandascript there is no harness-launched engine.
+    ("lightpanda-py", "lightpanda-py", "lightpanda", None),
 ]
 
 TASK_TIMEOUT_S = {"scrape": 180, "scrape_par": 180, "login": 120, "login_fx": 60, "retail": 180, "news": 180}
@@ -52,7 +57,8 @@ FIXTURE_PORT = 9280
 def script_path(driver, task):
     name = {"scrape": "hn_scrape", "scrape_par": "hn_scrape_par",
             "login": "hn_login", "login_fx": "hn_login_fx", "retail": "retail", "news": "news"}[task]
-    return ROOT / "scripts" / driver / f"{name}.js"
+    ext = "py" if driver in ("playwright-py", "lightpanda-py") else "js"
+    return ROOT / "scripts" / driver / f"{name}.{ext}"
 
 
 def validate(task, stdout):
@@ -123,15 +129,23 @@ def run_once(cfg, task, mode, lpd_path, chrome_path, held_browsers):
                     "LP_HN_USERNAME": "bench_user", "LP_HN_PASSWORD": "bench_pass"})
     rec = {"config": name, "task": task, "mode": mode}
 
-    if driver == "pandascript":
+    if driver in ("pandascript", "lightpanda-py"):
         persist = mode == "warm" and name != "pandascript-fresh"
-        cmd = [lpd_path, "agent", *lpd_cache_flags(name, persist=persist),
-               str(script_path(driver, task))]
+        cache = lpd_cache_flags(name, persist=persist)
+        if driver == "pandascript":
+            cmd = [lpd_path, "agent", *cache, str(script_path(driver, task))]
+        else:
+            # The script's Browser() spawns the sidecar itself; hand it the
+            # binary and the cache flags through the environment.
+            env["LIGHTPANDA_BIN"] = lpd_path
+            env["BENCH_LPD_ARGS"] = " ".join(cache)
+            cmd = [sys.executable, str(script_path(driver, task))]
         t0 = time.perf_counter()
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env)
         rec["ms"] = (time.perf_counter() - t0) * 1000
     else:
-        cmd = ["node", str(script_path(driver, task))]
+        runner = sys.executable if driver == "playwright-py" else "node"
+        cmd = [runner, str(script_path(driver, task))]
         browser = None
         try:
             if mode == "cold":
@@ -186,6 +200,14 @@ def collect_meta(lpd_path, chrome_path, args):
         if pj.exists():
             npm_versions[pkg] = json.loads(pj.read_text())["version"]
 
+    pip_versions = {}
+    for pkg in ("playwright", "lightpanda"):
+        try:
+            import importlib.metadata
+            pip_versions[pkg] = importlib.metadata.version(pkg)
+        except Exception:
+            pass
+
     return {
         "args": vars(args),
         "lpd_cache": bool(os.environ.get("LPD_CACHE")),
@@ -194,6 +216,8 @@ def collect_meta(lpd_path, chrome_path, args):
         "chrome": out([chrome_path, "--version"]),
         "node": out(["node", "--version"]),
         "npm_deps": npm_versions,
+        "python": platform.python_version(),
+        "pip_deps": pip_versions,
         "kernel": platform.release(),
         "cpu_governor": governor,
         "cpu_epp": epp,

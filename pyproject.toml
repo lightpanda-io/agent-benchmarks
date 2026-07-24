@@ -60,6 +60,16 @@ include = [
 dev = [
     "ruff>=0.6",
 ]
+# pandascript-vs-cdp Python contender legs (playwright-py-*, lightpanda-py).
+# Kept out of the base deps so the agent suites don't drag a browser driver.
+# Playwright is pinned to the same minor as the Node playwright-core dep.
+psbench = [
+    "playwright>=1.57,<1.58",
+    "lightpanda",
+]
+
+[tool.uv.sources]
+lightpanda = { path = "../browser/bindings/python", editable = true }
 
 [tool.ruff]
 line-length = 100

@@ -81,6 +81,12 @@ def run_config(cfg, task, lpd_path, chrome_path, fixture_env, lpd_flags=()):
     if driver == "pandascript":
         cmd = [lpd_path, "agent", *lpd_cache_flags("mem-agent"), *lpd_flags,
                str(script_path(driver, task))]
+    elif driver == "lightpanda-py":
+        # Browser() spawns the mcp sidecar without a new session id, so the
+        # script's session covers interpreter + sidecar for the PSS sum.
+        env["LIGHTPANDA_BIN"] = lpd_path
+        env["BENCH_LPD_ARGS"] = " ".join([*lpd_cache_flags("mem-lpd-py"), *lpd_flags])
+        cmd = [sys.executable, str(script_path(driver, task))]
     else:
         if engine == "chrome":
             browser = browsers.launch_chrome(chrome_path, port, SCRATCH / f"chrome-mem-{port}")
@@ -88,7 +94,8 @@ def run_config(cfg, task, lpd_path, chrome_path, fixture_env, lpd_flags=()):
             browser = browsers.launch_lightpanda(lpd_path, port, lpd_cache_flags(f"mem-serve-{port}"))
         sids.add(session_of(browser.proc.pid))
         env["BROWSER_WS"] = browser.endpoint
-        cmd = ["node", str(script_path(driver, task))]
+        runner = sys.executable if driver == "playwright-py" else "node"
+        cmd = [runner, str(script_path(driver, task))]
 
     t0 = time.perf_counter()
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
