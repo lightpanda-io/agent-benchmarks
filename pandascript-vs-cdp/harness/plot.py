@@ -19,15 +19,20 @@ SURFACE = "#fcfcfb"
 INK = "#0b0b0b"
 INK_2 = "#52514e"
 GRID = "#e4e3df"
-ACCENT = "#2a78d6"   # PandaScript rows
+ACCENT = "#2a78d6"   # first-party rows (PandaScript, Python bindings)
 NEUTRAL = "#8a897f"  # other configurations (identity lives in the row labels)
+
+FIRST_PARTY = {"pandascript", "lightpanda-py"}
 
 ROWS = [
     ("pandascript", "PandaScript replay"),
+    ("lightpanda-py", "Python bindings (pip install lightpanda)"),
     ("puppeteer-lightpanda", "Puppeteer → lightpanda serve"),
     ("playwright-lightpanda", "Playwright → lightpanda serve"),
+    ("playwright-py-lightpanda", "Playwright-Python → lightpanda serve"),
     ("puppeteer-chrome", "Puppeteer → Chrome"),
     ("playwright-chrome", "Playwright → Chrome"),
+    ("playwright-py-chrome", "Playwright-Python → Chrome"),
 ]
 
 TASKS = {
@@ -58,17 +63,17 @@ def load(task, mode, prefix):
         return runs
 
     runs = read(ROOT / "results" / f"{prefix}-{task}-{mode}" / "raw.jsonl")
-    # Warm-mode pandascript rows come from the -agentcache supplement when it
-    # exists (persistent per-session cache dir — the warm-state analogue of a
-    # held browser; same source as the published tables).
+    # Warm-mode rows for process-per-run configs come from the -agentcache
+    # supplement when it exists (persistent per-session cache dir — the
+    # warm-state analogue of a held browser; same source as the tables).
     supplement = ROOT / "results" / f"{prefix}-{task}-{mode}-agentcache" / "raw.jsonl"
     if mode == "warm" and supplement.exists():
-        runs["pandascript"] = read(supplement)["pandascript"]
+        runs.update(read(supplement))
     return runs
 
 
 def draw(task, title, prefix):
-    fig, axes = plt.subplots(1, 2, figsize=(9.2, 2.9), sharex=True, sharey=True)
+    fig, axes = plt.subplots(1, 2, figsize=(9.2, 4.1), sharex=True, sharey=True)
     fig.patch.set_facecolor(SURFACE)
 
     xmax = 0.0
@@ -80,7 +85,7 @@ def draw(task, title, prefix):
             if not values:
                 continue
             xmax = max(xmax, max(values))
-            color = ACCENT if config == "pandascript" else NEUTRAL
+            color = ACCENT if config in FIRST_PARTY else NEUTRAL
             # deterministic jitter: spread runs across a narrow band by index
             jitter = [((i % 5) - 2) * 0.07 for i in range(len(values))]
             ax.scatter(values, [y + j for j in jitter], s=22, color=color,
@@ -101,8 +106,8 @@ def draw(task, title, prefix):
     axes[0].set_yticks(range(len(ROWS)))
     axes[0].set_yticklabels([label for _, label in reversed(ROWS)], fontsize=9.5)
     for tick, (config, _) in zip(axes[0].get_yticklabels(), reversed(ROWS)):
-        tick.set_color(INK if config == "pandascript" else INK_2)
-        if config == "pandascript":
+        tick.set_color(INK if config in FIRST_PARTY else INK_2)
+        if config in FIRST_PARTY:
             tick.set_fontweight("bold")
     axes[0].set_xlim(0, xmax * 1.06)
     for ax in axes:
@@ -119,10 +124,70 @@ def draw(task, title, prefix):
     print(f"wrote figures/{task}.svg")
 
 
+MEMORY_TASKS = {"scrape": "HN scrape", "retail": "Retail (gymshark)", "news": "News (apnews)"}
+
+
+def draw_memory(prefix):
+    path = ROOT / "results" / f"{prefix}-memory" / "raw.jsonl"
+    if not path.exists():
+        print(f"skip memory figure: no {path}")
+        return
+    by = {}
+    for line in path.read_text().splitlines():
+        r = json.loads(line)
+        if r.get("ok"):
+            by.setdefault((r["task"], r["config"]), []).append(r["peak_pss_mb"])
+
+    fig, axes = plt.subplots(1, len(MEMORY_TASKS), figsize=(9.2, 3.3), sharey=True)
+    fig.patch.set_facecolor(SURFACE)
+
+    for ax, (task, subtitle) in zip(axes, MEMORY_TASKS.items()):
+        ax.set_facecolor(SURFACE)
+        for y, (config, label) in enumerate(reversed(ROWS)):
+            values = by.get((task, config))
+            if not values:
+                continue
+            med = statistics.median(values)
+            color = ACCENT if config in FIRST_PARTY else NEUTRAL
+            ax.barh(y, med, height=0.55, color=color, zorder=3)
+            ax.annotate(f"{med:,.0f}", (med, y), xytext=(4, 0),
+                        textcoords="offset points", va="center",
+                        fontsize=8.5, color=INK_2, zorder=4)
+        ax.set_title(subtitle, fontsize=10, color=INK_2, loc="left", pad=8)
+        ax.set_xlim(left=0)
+        ax.margins(x=0.14)
+        ax.grid(axis="x", color=GRID, linewidth=0.7, zorder=0)
+        ax.tick_params(axis="y", length=0)
+        ax.tick_params(axis="x", length=0)
+        for spine in ("top", "right", "left"):
+            ax.spines[spine].set_visible(False)
+        ax.spines["bottom"].set_color(GRID)
+        ax.set_xlabel("peak memory, MB (PSS)", fontsize=9, color=INK_2)
+
+    axes[0].set_yticks(range(len(ROWS)))
+    axes[0].set_yticklabels([label for _, label in reversed(ROWS)], fontsize=9.5)
+    for tick, (config, _) in zip(axes[0].get_yticklabels(), reversed(ROWS)):
+        tick.set_color(INK if config in FIRST_PARTY else INK_2)
+        if config in FIRST_PARTY:
+            tick.set_fontweight("bold")
+
+    fig.suptitle("Peak memory over the whole process tree — median of 5 cold runs",
+                 fontsize=11.5, x=0.005, y=1.02, ha="left", color=INK)
+    fig.tight_layout()
+
+    OUT.mkdir(exist_ok=True)
+    for ext in ("svg", "png"):
+        fig.savefig(OUT / f"memory.{ext}", bbox_inches="tight",
+                    facecolor=SURFACE, dpi=160)
+    plt.close(fig)
+    print("wrote figures/memory.svg")
+
+
 def main():
     prefix = sys.argv[1] if len(sys.argv) > 1 else "stock"
     for task, title in TASKS.items():
         draw(task, title, prefix)
+    draw_memory(prefix)
 
 
 if __name__ == "__main__":

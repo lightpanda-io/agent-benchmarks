@@ -212,7 +212,7 @@ def collect_meta(lpd_path, chrome_path, args):
         "args": vars(args),
         "lpd_cache": bool(os.environ.get("LPD_CACHE")),
         "agent_warm_cache": "persistent-per-session",
-        "lightpanda": out([lpd_path, "--version"]),
+        "lightpanda": out([lpd_path, "version"]),
         "chrome": out([chrome_path, "--version"]),
         "node": out(["node", "--version"]),
         "npm_deps": npm_versions,
@@ -273,7 +273,8 @@ def main():
     held = {}
     if args.mode == "warm":
         for name, driver, engine, port in configs:
-            if driver != "pandascript":
+            # pandascript and lightpanda-py own their browser process per run.
+            if driver not in ("pandascript", "lightpanda-py"):
                 held[name] = launch_browser(engine, port, lpd_path, chrome_path)
 
     raw = open(out_dir / "raw.jsonl", "a")
