@@ -67,8 +67,9 @@ The two Python legs (deps: `uv sync --group psbench` in the repo root):
   run as `python script.py` against the same harness-launched browsers.
   Same cold/warm semantics as the Node CDP legs; pays Python interpreter
   startup where Node legs pay `node` startup.
-- **lightpanda-py** — the lightpanda Python bindings
-  (`browser/bindings/python`): `Browser()` spawns its own `lightpanda mcp`
+- **lightpanda-py** — the lightpanda Python package
+  ([lightpanda-io/lightpanda-python](https://github.com/lightpanda-io/lightpanda-python),
+  a sibling checkout via the `psbench` uv group): `Browser()` spawns its own `lightpanda mcp`
   sidecar and drives it over MCP HTTP, so like pandascript there is no
   harness-launched engine and cold timing covers the whole
   `python script.py` (interpreter + sidecar spawn + task). Cache flags reach
