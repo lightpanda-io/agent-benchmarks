@@ -69,7 +69,7 @@ psbench = [
 ]
 
 [tool.uv.sources]
-lightpanda = { path = "../browser/bindings/python", editable = true }
+lightpanda = { path = "../lightpanda-python", editable = true }
 
 [tool.ruff]
 line-length = 100

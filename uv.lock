@@ -52,7 +52,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [{ name = "ruff", specifier = ">=0.6" }]
 psbench = [
-    { name = "lightpanda", editable = "../browser/bindings/python" },
+    { name = "lightpanda", editable = "../lightpanda-python" },
     { name = "playwright", specifier = ">=1.57,<1.58" },
 ]
 
@@ -1276,7 +1276,7 @@ wheels = [
 [[package]]
 name = "lightpanda"
 version = "0.1.0.dev0"
-source = { editable = "../browser/bindings/python" }
+source = { editable = "../lightpanda-python" }
 
 [package.metadata]
 
