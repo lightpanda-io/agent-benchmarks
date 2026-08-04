@@ -1,0 +1,36 @@
+{
+  "args": {
+    "task": "news",
+    "mode": "cold",
+    "runs": 12,
+    "warmup": 2,
+    "pace": 3.0,
+    "configs": "pandascript,puppeteer-lightpanda,puppeteer-chrome,playwright-lightpanda,playwright-chrome",
+    "out": "results/v7-news-cold",
+    "lpd_flags": "--disable-subframes"
+  },
+  "lpd_cache": true,
+  "agent_warm_cache": "persistent-per-session",
+  "lightpanda": "1.0.0-dev.8500+e14353398",
+  "lightpanda_binary": {
+    "sha256": "5d86f388e67ebb1010b13ebf1e54089d050397e034938aa6263cc718516f903d",
+    "size": 161683824,
+    "mtime": 1785830318.684709
+  },
+  "chrome": "Google Chrome 151.0.7922.71",
+  "node": "v26.5.1",
+  "npm_deps": {
+    "puppeteer-core": "24.14.0",
+    "playwright-core": "1.57.0"
+  },
+  "python": "3.12.13",
+  "pip_deps": {
+    "playwright": "1.57.0",
+    "lightpanda": "0.1.0.dev0"
+  },
+  "kernel": "7.1.5-arch1-2",
+  "cpu_governor": "powersave",
+  "cpu_epp": "performance",
+  "platform_profile": "performance",
+  "started_utc": "2026-08-04T11:55:23.982061+00:00"
+}

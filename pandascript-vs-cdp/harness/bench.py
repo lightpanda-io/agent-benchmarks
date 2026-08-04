@@ -112,11 +112,16 @@ def lpd_cache_flags(tag, persist=False):
 
 _persisted_cache_dirs = set()
 
+# Extra lightpanda flags (from --lpd-flags), applied to every lightpanda
+# invocation — agent runs, serve launches, and the lightpanda-py sidecar —
+# never to Chrome.
+_lpd_extra = []
+
 
 def launch_browser(engine, port, lpd_path, chrome_path):
     if engine == "chrome":
         return browsers.launch_chrome(chrome_path, port, SCRATCH / f"chrome-profile-{port}")
-    return browsers.launch_lightpanda(lpd_path, port, lpd_cache_flags(f"serve-{port}"))
+    return browsers.launch_lightpanda(lpd_path, port, [*lpd_cache_flags(f"serve-{port}"), *_lpd_extra])
 
 
 def run_once(cfg, task, mode, lpd_path, chrome_path, held_browsers):
@@ -133,12 +138,12 @@ def run_once(cfg, task, mode, lpd_path, chrome_path, held_browsers):
         persist = mode == "warm" and name != "pandascript-fresh"
         cache = lpd_cache_flags(name, persist=persist)
         if driver == "pandascript":
-            cmd = [lpd_path, "agent", *cache, str(script_path(driver, task))]
+            cmd = [lpd_path, "agent", *cache, *_lpd_extra, str(script_path(driver, task))]
         else:
             # The script's Browser() spawns the sidecar itself; hand it the
             # binary and the cache flags through the environment.
             env["LIGHTPANDA_BIN"] = lpd_path
-            env["BENCH_LPD_ARGS"] = " ".join(cache)
+            env["BENCH_LPD_ARGS"] = " ".join([*cache, *_lpd_extra])
             cmd = [sys.executable, str(script_path(driver, task))]
         t0 = time.perf_counter()
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env)
@@ -178,6 +183,17 @@ def run_once(cfg, task, mode, lpd_path, chrome_path, held_browsers):
 
 
 def collect_meta(lpd_path, chrome_path, args):
+    # The version string alone can't tell a debug build from ReleaseFast at
+    # the same commit — hash the actual binary so a mid-campaign swap of
+    # LPD_PATH's target is detectable after the fact.
+    import hashlib
+    h = hashlib.sha256()
+    with open(lpd_path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    binary = {"sha256": h.hexdigest(), "size": os.path.getsize(lpd_path),
+              "mtime": os.path.getmtime(lpd_path)}
+
     def out(cmd):
         try:
             return subprocess.run(cmd, capture_output=True, text=True, timeout=30).stdout.strip()
@@ -213,6 +229,7 @@ def collect_meta(lpd_path, chrome_path, args):
         "lpd_cache": bool(os.environ.get("LPD_CACHE")),
         "agent_warm_cache": "persistent-per-session",
         "lightpanda": out([lpd_path, "version"]),
+        "lightpanda_binary": binary,
         "chrome": out([chrome_path, "--version"]),
         "node": out(["node", "--version"]),
         "npm_deps": npm_versions,
@@ -235,7 +252,9 @@ def main():
     ap.add_argument("--pace", type=float, default=3.0, help="seconds between executions")
     ap.add_argument("--configs", default=None, help="comma-separated subset of config names")
     ap.add_argument("--out", default=None, help="results dir (default: results/<UTC ts>)")
+    ap.add_argument("--lpd-flags", default="", help="comma-separated extra flags for every lightpanda invocation (recorded in meta.json)")
     args = ap.parse_args()
+    _lpd_extra.extend(f for f in args.lpd_flags.split(",") if f)
 
     lpd_path = os.environ.get("LPD_PATH")
     if not lpd_path:

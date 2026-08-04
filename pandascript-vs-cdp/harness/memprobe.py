@@ -91,7 +91,7 @@ def run_config(cfg, task, lpd_path, chrome_path, fixture_env, lpd_flags=()):
         if engine == "chrome":
             browser = browsers.launch_chrome(chrome_path, port, SCRATCH / f"chrome-mem-{port}")
         else:
-            browser = browsers.launch_lightpanda(lpd_path, port, lpd_cache_flags(f"mem-serve-{port}"))
+            browser = browsers.launch_lightpanda(lpd_path, port, [*lpd_cache_flags(f"mem-serve-{port}"), *lpd_flags])
         sids.add(session_of(browser.proc.pid))
         env["BROWSER_WS"] = browser.endpoint
         runner = sys.executable if driver == "playwright-py" else "node"

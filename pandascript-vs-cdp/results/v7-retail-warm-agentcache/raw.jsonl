@@ -1,0 +1,14 @@
+{"config": "pandascript", "task": "retail", "mode": "warm", "ms": 7954.554491007002, "exit": 0, "ok": true, "rotation": 0, "warmup": true, "ts": "2026-08-04T12:31:54.444306+00:00"}
+{"config": "pandascript", "task": "retail", "mode": "warm", "ms": 4726.101455977187, "exit": 0, "ok": true, "rotation": 1, "warmup": true, "ts": "2026-08-04T12:32:02.170727+00:00"}
+{"config": "pandascript", "task": "retail", "mode": "warm", "ms": 4760.333585989429, "exit": 0, "ok": true, "rotation": 2, "warmup": false, "ts": "2026-08-04T12:32:09.931462+00:00"}
+{"config": "pandascript", "task": "retail", "mode": "warm", "ms": 3731.906244007405, "exit": 0, "ok": true, "rotation": 3, "warmup": false, "ts": "2026-08-04T12:32:16.663761+00:00"}
+{"config": "pandascript", "task": "retail", "mode": "warm", "ms": 6481.345050007803, "exit": 0, "ok": true, "rotation": 4, "warmup": false, "ts": "2026-08-04T12:32:26.145681+00:00"}
+{"config": "pandascript", "task": "retail", "mode": "warm", "ms": 4654.887558979681, "exit": 0, "ok": true, "rotation": 5, "warmup": false, "ts": "2026-08-04T12:32:33.800974+00:00"}
+{"config": "pandascript", "task": "retail", "mode": "warm", "ms": 4273.040074011078, "exit": 0, "ok": true, "rotation": 6, "warmup": false, "ts": "2026-08-04T12:32:41.074517+00:00"}
+{"config": "pandascript", "task": "retail", "mode": "warm", "ms": 4110.946265020175, "exit": 0, "ok": true, "rotation": 7, "warmup": false, "ts": "2026-08-04T12:32:48.185831+00:00"}
+{"config": "pandascript", "task": "retail", "mode": "warm", "ms": 3902.770068991231, "exit": 0, "ok": true, "rotation": 8, "warmup": false, "ts": "2026-08-04T12:32:55.089022+00:00"}
+{"config": "pandascript", "task": "retail", "mode": "warm", "ms": 4577.081507013645, "exit": 0, "ok": true, "rotation": 9, "warmup": false, "ts": "2026-08-04T12:33:02.666688+00:00"}
+{"config": "pandascript", "task": "retail", "mode": "warm", "ms": 5035.13203500188, "exit": 1, "ok": false, "error": "exit 1: $time=1785846790698 $scope=frame $level=error $msg=\"navigate failed\" err=OperationTimedout type=root url=https://eu.gymshark.com/es-ES/collections/all-products/mens\n\u001b[1m\u001b[31mError: navigation failed\u001b[0m\n", "rotation": 10, "warmup": false, "ts": "2026-08-04T12:33:10.702221+00:00"}
+{"config": "pandascript", "task": "retail", "mode": "warm", "ms": 4674.633543007076, "exit": 0, "ok": true, "rotation": 11, "warmup": false, "ts": "2026-08-04T12:33:18.377204+00:00"}
+{"config": "pandascript", "task": "retail", "mode": "warm", "ms": 4505.721688008634, "exit": 0, "ok": true, "rotation": 12, "warmup": false, "ts": "2026-08-04T12:33:25.883344+00:00"}
+{"config": "pandascript", "task": "retail", "mode": "warm", "ms": 5855.292958003702, "exit": 0, "ok": true, "rotation": 13, "warmup": false, "ts": "2026-08-04T12:33:34.739121+00:00"}

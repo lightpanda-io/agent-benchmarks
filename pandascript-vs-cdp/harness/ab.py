@@ -42,6 +42,9 @@ def variant_defs(lpd_path):
         # binary variants: point at a differently-built binary, no extra flags
         "bin:modmap": (os.environ.get("LPD_MODMAP", ""), [], {}),
         "bin:pipewait": (os.environ.get("LPD_PIPEWAIT", ""), [], {}),
+        # binary A/B under the campaign's cold cache config (fresh dir per run)
+        "bin:old": (os.environ.get("LPD_OLD", ""), ["--http-cache-dir", "PER_RUN_DIR"], {}),
+        "bin:new": (os.environ.get("LPD_NEW", ""), ["--http-cache-dir", "PER_RUN_DIR"], {}),
     }
 
 

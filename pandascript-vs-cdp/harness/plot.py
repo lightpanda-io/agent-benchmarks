@@ -76,11 +76,16 @@ def draw(task, title, prefix):
     fig, axes = plt.subplots(1, 2, figsize=(9.2, 4.1), sharex=True, sharey=True)
     fig.patch.set_facecolor(SURFACE)
 
+    # Only lay out rows for configs the dataset actually ran — a campaign
+    # without e.g. the Python legs shouldn't render empty lanes.
+    present = set(load(task, "cold", prefix)) | set(load(task, "warm", prefix))
+    rows = [r for r in ROWS if r[0] in present]
+
     xmax = 0.0
     for ax, mode in zip(axes, ("cold", "warm")):
         runs = load(task, mode, prefix)
         ax.set_facecolor(SURFACE)
-        for y, (config, label) in enumerate(reversed(ROWS)):
+        for y, (config, label) in enumerate(reversed(rows)):
             values = runs.get(config, [])
             if not values:
                 continue
@@ -103,9 +108,9 @@ def draw(task, title, prefix):
             ax.spines[spine].set_visible(False)
         ax.spines["bottom"].set_color(GRID)
 
-    axes[0].set_yticks(range(len(ROWS)))
-    axes[0].set_yticklabels([label for _, label in reversed(ROWS)], fontsize=9.5)
-    for tick, (config, _) in zip(axes[0].get_yticklabels(), reversed(ROWS)):
+    axes[0].set_yticks(range(len(rows)))
+    axes[0].set_yticklabels([label for _, label in reversed(rows)], fontsize=9.5)
+    for tick, (config, _) in zip(axes[0].get_yticklabels(), reversed(rows)):
         tick.set_color(INK if config in FIRST_PARTY else INK_2)
         if config in FIRST_PARTY:
             tick.set_fontweight("bold")
@@ -141,9 +146,11 @@ def draw_memory(prefix):
     fig, axes = plt.subplots(1, len(MEMORY_TASKS), figsize=(9.2, 3.3), sharey=True)
     fig.patch.set_facecolor(SURFACE)
 
+    rows = [r for r in ROWS if any((t, r[0]) in by for t in MEMORY_TASKS)]
+
     for ax, (task, subtitle) in zip(axes, MEMORY_TASKS.items()):
         ax.set_facecolor(SURFACE)
-        for y, (config, label) in enumerate(reversed(ROWS)):
+        for y, (config, label) in enumerate(reversed(rows)):
             values = by.get((task, config))
             if not values:
                 continue
@@ -164,9 +171,9 @@ def draw_memory(prefix):
         ax.spines["bottom"].set_color(GRID)
         ax.set_xlabel("peak memory, MB (PSS)", fontsize=9, color=INK_2)
 
-    axes[0].set_yticks(range(len(ROWS)))
-    axes[0].set_yticklabels([label for _, label in reversed(ROWS)], fontsize=9.5)
-    for tick, (config, _) in zip(axes[0].get_yticklabels(), reversed(ROWS)):
+    axes[0].set_yticks(range(len(rows)))
+    axes[0].set_yticklabels([label for _, label in reversed(rows)], fontsize=9.5)
+    for tick, (config, _) in zip(axes[0].get_yticklabels(), reversed(rows)):
         tick.set_color(INK if config in FIRST_PARTY else INK_2)
         if config in FIRST_PARTY:
             tick.set_fontweight("bold")
