@@ -1,7 +1,9 @@
 """Strip plots of per-run benchmark timings, one SVG per live task.
 
-Usage: uv run --with matplotlib python harness/plot.py [results-prefix]
+Usage: uv run --with matplotlib python harness/plot.py [results-prefix] [figure-prefix]
 Reads results/<prefix>-<task>-{cold,warm}/raw.jsonl (default prefix: stock).
+figure-prefix, when given, is prepended to output basenames (e.g. `v7py py-`
+writes figures/py-scrape.svg) so two campaigns' figures can coexist.
 """
 
 import json
@@ -72,7 +74,7 @@ def load(task, mode, prefix):
     return runs
 
 
-def draw(task, title, prefix):
+def draw(task, title, prefix, fig_prefix=""):
     fig, axes = plt.subplots(1, 2, figsize=(9.2, 4.1), sharex=True, sharey=True)
     fig.patch.set_facecolor(SURFACE)
 
@@ -123,16 +125,16 @@ def draw(task, title, prefix):
 
     OUT.mkdir(exist_ok=True)
     for ext in ("svg", "png"):
-        fig.savefig(OUT / f"{task}.{ext}", bbox_inches="tight",
+        fig.savefig(OUT / f"{fig_prefix}{task}.{ext}", bbox_inches="tight",
                     facecolor=SURFACE, dpi=160)
     plt.close(fig)
-    print(f"wrote figures/{task}.svg")
+    print(f"wrote figures/{fig_prefix}{task}.svg")
 
 
 MEMORY_TASKS = {"scrape": "HN scrape", "retail": "Retail (gymshark)", "news": "News (apnews)"}
 
 
-def draw_memory(prefix):
+def draw_memory(prefix, fig_prefix=""):
     path = ROOT / "results" / f"{prefix}-memory" / "raw.jsonl"
     if not path.exists():
         print(f"skip memory figure: no {path}")
@@ -184,17 +186,18 @@ def draw_memory(prefix):
 
     OUT.mkdir(exist_ok=True)
     for ext in ("svg", "png"):
-        fig.savefig(OUT / f"memory.{ext}", bbox_inches="tight",
+        fig.savefig(OUT / f"{fig_prefix}memory.{ext}", bbox_inches="tight",
                     facecolor=SURFACE, dpi=160)
     plt.close(fig)
-    print("wrote figures/memory.svg")
+    print(f"wrote figures/{fig_prefix}memory.svg")
 
 
 def main():
     prefix = sys.argv[1] if len(sys.argv) > 1 else "stock"
+    fig_prefix = sys.argv[2] if len(sys.argv) > 2 else ""
     for task, title in TASKS.items():
-        draw(task, title, prefix)
-    draw_memory(prefix)
+        draw(task, title, prefix, fig_prefix)
+    draw_memory(prefix, fig_prefix)
 
 
 if __name__ == "__main__":
