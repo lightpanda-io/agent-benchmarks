@@ -14,7 +14,7 @@ const urls = [...new Set(links)].slice(0, 3);
 
 const articles = [];
 for (const url of urls) {
-  await page.goto(url);
+  await page.goto(url, { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".RichTextStoryBody p");
   const headline = await page.$eval("h1", (h) => h.textContent.trim());
   const paragraphs = await page.$$eval(".RichTextStoryBody p", (ps) =>

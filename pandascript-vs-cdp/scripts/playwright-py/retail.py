@@ -22,7 +22,7 @@ with sync_playwright() as p:
     )
 
     for product in products:
-        page.goto(product["url"])
+        page.goto(product["url"], wait_until="domcontentloaded")
         page.wait_for_selector("fieldset[class*='add-to-cart_sizes']")
         price_text = page.text_content("[class*='product-information_price']")
         product["price"] = float(re.search(r"\d+(?:\.\d+)?", price_text.replace(",", ".")).group())

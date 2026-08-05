@@ -13,7 +13,7 @@ const { products } = page.extract({
 });
 
 for (const product of products) {
-  await page.goto(product.url);
+  await page.goto(product.url, { waitUntil: "domcontentloaded" });
   page.waitForSelector("fieldset[class*='add-to-cart_sizes']");
   const details = page.extract({
     price: { selector: "[class*='product-information_price']" },

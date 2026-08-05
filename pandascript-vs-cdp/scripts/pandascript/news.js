@@ -8,7 +8,7 @@ const urls = [...new Set(links)].slice(0, 3);
 
 const articles = [];
 for (const url of urls) {
-  await page.goto(url);
+  await page.goto(url, { waitUntil: "domcontentloaded" });
   page.waitForSelector(".RichTextStoryBody p");
   const article = page.extract({
     headline: "h1",

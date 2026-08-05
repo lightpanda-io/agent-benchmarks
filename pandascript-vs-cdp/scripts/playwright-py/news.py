@@ -20,7 +20,7 @@ with sync_playwright() as p:
 
     articles = []
     for url in urls:
-        page.goto(url)
+        page.goto(url, wait_until="domcontentloaded")
         page.wait_for_selector(".RichTextStoryBody p")
         headline = page.eval_on_selector("h1", "(h) => h.textContent.trim()")
         paragraphs = page.eval_on_selector_all(

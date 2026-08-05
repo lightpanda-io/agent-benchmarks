@@ -15,7 +15,7 @@ const products = await page.$$eval("[class*='product-card_card-wrapper']", (card
 );
 
 for (const product of products) {
-  await page.goto(product.url);
+  await page.goto(product.url, { waitUntil: "domcontentloaded" });
   await page.waitForSelector("fieldset[class*='add-to-cart_sizes']");
   product.price = parseFloat((await page.$eval(
     "[class*='product-information_price']",
