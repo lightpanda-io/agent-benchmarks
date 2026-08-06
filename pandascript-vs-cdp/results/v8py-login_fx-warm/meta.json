@@ -1,0 +1,36 @@
+{
+  "args": {
+    "task": "login_fx",
+    "mode": "warm",
+    "runs": 20,
+    "warmup": 2,
+    "pace": 1.0,
+    "configs": "pandascript,lightpanda-py,playwright-py-lightpanda,playwright-py-chrome",
+    "out": "results/v8py-login_fx-warm",
+    "lpd_flags": "--disable-subframes"
+  },
+  "lpd_cache": true,
+  "agent_warm_cache": "persistent-per-session",
+  "lightpanda": "1.0.0-dev.8547+f55aa1a66",
+  "lightpanda_binary": {
+    "sha256": "ec433952f717e2bc483258a628332700391856febad67ac926815715559d173d",
+    "size": 161831680,
+    "mtime": 1786000795.5943751
+  },
+  "chrome": "Google Chrome 151.0.7922.71",
+  "node": "v26.5.1",
+  "npm_deps": {
+    "puppeteer-core": "24.14.0",
+    "playwright-core": "1.57.0"
+  },
+  "python": "3.12.13",
+  "pip_deps": {
+    "playwright": "1.57.0",
+    "lightpanda": "0.1.0.dev0"
+  },
+  "kernel": "7.1.5-arch1-2",
+  "cpu_governor": "powersave",
+  "cpu_epp": "performance",
+  "platform_profile": "performance",
+  "started_utc": "2026-08-06T10:43:52.663685+00:00"
+}
