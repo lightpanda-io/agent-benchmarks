@@ -1,0 +1,14 @@
+{"config": "pandascript", "task": "news", "mode": "warm", "ms": 6648.249650999787, "exit": 0, "ok": true, "rotation": 0, "warmup": true, "ts": "2026-08-06T08:22:15.074601+00:00"}
+{"config": "pandascript", "task": "news", "mode": "warm", "ms": 4578.36753400079, "exit": 0, "ok": true, "rotation": 1, "warmup": true, "ts": "2026-08-06T08:22:22.653467+00:00"}
+{"config": "pandascript", "task": "news", "mode": "warm", "ms": 4325.230426000417, "exit": 0, "ok": true, "rotation": 2, "warmup": false, "ts": "2026-08-06T08:22:29.979166+00:00"}
+{"config": "pandascript", "task": "news", "mode": "warm", "ms": 4081.719493999117, "exit": 0, "ok": true, "rotation": 3, "warmup": false, "ts": "2026-08-06T08:22:37.061282+00:00"}
+{"config": "pandascript", "task": "news", "mode": "warm", "ms": 4075.7069359988236, "exit": 0, "ok": true, "rotation": 4, "warmup": false, "ts": "2026-08-06T08:22:44.137365+00:00"}
+{"config": "pandascript", "task": "news", "mode": "warm", "ms": 3721.7648340010783, "exit": 0, "ok": true, "rotation": 5, "warmup": false, "ts": "2026-08-06T08:22:50.859504+00:00"}
+{"config": "pandascript", "task": "news", "mode": "warm", "ms": 4129.941544000758, "exit": 0, "ok": true, "rotation": 6, "warmup": false, "ts": "2026-08-06T08:22:57.989743+00:00"}
+{"config": "pandascript", "task": "news", "mode": "warm", "ms": 3726.999963999333, "exit": 0, "ok": true, "rotation": 7, "warmup": false, "ts": "2026-08-06T08:23:04.717152+00:00"}
+{"config": "pandascript", "task": "news", "mode": "warm", "ms": 4379.826697999306, "exit": 0, "ok": true, "rotation": 8, "warmup": false, "ts": "2026-08-06T08:23:12.097351+00:00"}
+{"config": "pandascript", "task": "news", "mode": "warm", "ms": 3892.8946619998896, "exit": 0, "ok": true, "rotation": 9, "warmup": false, "ts": "2026-08-06T08:23:18.990731+00:00"}
+{"config": "pandascript", "task": "news", "mode": "warm", "ms": 4227.07291199913, "exit": 0, "ok": true, "rotation": 10, "warmup": false, "ts": "2026-08-06T08:23:26.218131+00:00"}
+{"config": "pandascript", "task": "news", "mode": "warm", "ms": 3792.4220280001464, "exit": 0, "ok": true, "rotation": 11, "warmup": false, "ts": "2026-08-06T08:23:33.011043+00:00"}
+{"config": "pandascript", "task": "news", "mode": "warm", "ms": 4112.345112000185, "exit": 0, "ok": true, "rotation": 12, "warmup": false, "ts": "2026-08-06T08:23:40.123835+00:00"}
+{"config": "pandascript", "task": "news", "mode": "warm", "ms": 3901.8409290001728, "exit": 0, "ok": true, "rotation": 13, "warmup": false, "ts": "2026-08-06T08:23:47.026251+00:00"}
