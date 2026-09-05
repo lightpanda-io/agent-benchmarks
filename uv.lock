@@ -1282,8 +1282,10 @@ source = { editable = "../lightpanda-python" }
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "playwright", specifier = ">=1.45" },
     { name = "pytest", specifier = ">=8" },
     { name = "pytest-asyncio", specifier = ">=1.0" },
+    { name = "selenium", specifier = ">=4.32" },
 ]
 docs = [{ name = "pdoc" }]
 

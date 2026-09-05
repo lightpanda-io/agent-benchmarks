@@ -16,6 +16,7 @@ import datetime
 import json
 import os
 import pathlib
+import shutil
 import subprocess
 import sys
 import threading
@@ -23,7 +24,8 @@ import time
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 import browsers
-from bench import CONFIGS, FIXTURE_PORT, TASK_TIMEOUT_S, lpd_cache_flags, script_path, validate
+from bench import (CONFIGS, FIXTURE_PORT, TASK_TIMEOUT_S, browseruse_dirs, browseruse_env,
+                   browseruse_wipe, kill_browseruse_daemon, lpd_cache_flags, script_path, validate)
 
 ROOT = pathlib.Path(__file__).parent.parent
 SCRATCH = pathlib.Path(os.environ.get("BENCH_SCRATCH", "/tmp")) / "pandascript-vs-cdp"
@@ -76,6 +78,7 @@ def run_config(cfg, task, lpd_path, chrome_path, fixture_env, lpd_flags=()):
     name, driver, engine, port = cfg
     env = {**os.environ, "LIGHTPANDA_DISABLE_TELEMETRY": "true", **fixture_env}
     browser = None
+    stdin_text = None
     sids = set()
 
     if driver == "pandascript":
@@ -89,27 +92,53 @@ def run_config(cfg, task, lpd_path, chrome_path, fixture_env, lpd_flags=()):
         cmd = [sys.executable, str(script_path(driver, task))]
     else:
         if engine == "chrome":
+            if driver == "browseruse":
+                # Default-context CLI sees the profile's cache — keep the
+                # cold-run protocol honest (see bench.run_once).
+                shutil.rmtree(SCRATCH / f"chrome-mem-{port}", ignore_errors=True)
             browser = browsers.launch_chrome(chrome_path, port, SCRATCH / f"chrome-mem-{port}")
         else:
             browser = browsers.launch_lightpanda(lpd_path, port, [*lpd_cache_flags(f"mem-serve-{port}"), *lpd_flags])
         sids.add(session_of(browser.proc.pid))
-        env["BROWSER_WS"] = browser.endpoint
-        runner = sys.executable if driver == "playwright-py" else "node"
-        cmd = [runner, str(script_path(driver, task))]
+        if driver == "browseruse":
+            browseruse_wipe(name)
+            env.update(browseruse_env(name, browser.endpoint))
+            cmd = [os.environ.get("BROWSER_USE_BIN", "browser-use")]
+            stdin_text = script_path(driver, task).read_text()
+        else:
+            env["BROWSER_WS"] = browser.endpoint
+            runner = sys.executable if driver == "playwright-py" else "node"
+            cmd = [runner, str(script_path(driver, task))]
 
     t0 = time.perf_counter()
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                            stdin=subprocess.PIPE if stdin_text is not None else None,
                             text=True, env=env, start_new_session=True)
     sids.add(session_of(proc.pid))
     sampler = PeakSampler({s for s in sids if s})
     sampler.start()
+    if driver == "browseruse":
+        # The CLI spawns its daemon with setsid, outside both sampled sessions;
+        # fold its session in as soon as the pid file appears.
+        def track_daemon():
+            pid_file = browseruse_dirs(name)[1] / "bu.pid"
+            deadline = time.time() + 15
+            while time.time() < deadline:
+                try:
+                    sampler.sids.add(session_of(int(pid_file.read_text())))
+                    return
+                except (OSError, ValueError):
+                    time.sleep(0.05)
+        threading.Thread(target=track_daemon, daemon=True).start()
     try:
-        stdout, _ = proc.communicate(timeout=TASK_TIMEOUT_S[task])
+        stdout, _ = proc.communicate(input=stdin_text, timeout=TASK_TIMEOUT_S[task])
     except subprocess.TimeoutExpired:
         proc.kill()
         stdout = ""
     elapsed = time.perf_counter() - t0
     sampler.stop()
+    if driver == "browseruse":
+        kill_browseruse_daemon(name)
     if browser is not None:
         browser.kill()
 
@@ -154,6 +183,8 @@ def main():
                 time.sleep(0.5)
             configs = CONFIGS if not args.configs else \
                 [c for c in CONFIGS if c[0] in args.configs.split(",")]
+            if any(c[1] == "browseruse" for c in configs) and not os.environ.get("BROWSER_USE_BIN"):
+                sys.exit("browseruse configs need BROWSER_USE_BIN (see bench.py)")
             lpd_flags = tuple(f for f in args.lpd_flags.split(",") if f)
             for i in range(args.iters):
                 for cfg in configs:

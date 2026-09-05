@@ -22,6 +22,7 @@ import os
 import pathlib
 import platform
 import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -47,6 +48,12 @@ CONFIGS = [
     # Python bindings: the script's Browser() spawns its own `lightpanda mcp`
     # sidecar, so like pandascript there is no harness-launched engine.
     ("lightpanda-py", "lightpanda-py", "lightpanda", None),
+    # browser-use CLI (browser-harness): the script pipes into `browser-use`,
+    # which spawns a daemon holding one CDP websocket to a harness-launched
+    # engine (its local mode only attaches to a desktop Chrome, so both legs
+    # get the engine via BU_CDP_URL/BU_CDP_WS like the other CDP configs).
+    ("browseruse-chrome", "browseruse", "chrome", 9237),
+    ("browseruse-lightpanda", "browseruse", "lightpanda", 9238),
 ]
 
 TASK_TIMEOUT_S = {"scrape": 180, "scrape_par": 180, "login": 120, "login_fx": 60, "retail": 180, "news": 180}
@@ -57,7 +64,7 @@ FIXTURE_PORT = 9280
 def script_path(driver, task):
     name = {"scrape": "hn_scrape", "scrape_par": "hn_scrape_par",
             "login": "hn_login", "login_fx": "hn_login_fx", "retail": "retail", "news": "news"}[task]
-    ext = "py" if driver in ("playwright-py", "lightpanda-py") else "js"
+    ext = "py" if driver in ("playwright-py", "lightpanda-py", "browseruse") else "js"
     return ROOT / "scripts" / driver / f"{name}.{ext}"
 
 
@@ -112,6 +119,10 @@ def lpd_cache_flags(tag, persist=False):
 
 _persisted_cache_dirs = set()
 
+# Per-config consecutive warm-failure count for the browseruse held-browser
+# recycle heuristic in run_once.
+_bu_warm_fails = {}
+
 # Extra lightpanda flags (from --lpd-flags), applied to every lightpanda
 # invocation — agent runs, serve launches, and the lightpanda-py sidecar —
 # never to Chrome.
@@ -122,6 +133,49 @@ def launch_browser(engine, port, lpd_path, chrome_path):
     if engine == "chrome":
         return browsers.launch_chrome(chrome_path, port, SCRATCH / f"chrome-profile-{port}")
     return browsers.launch_lightpanda(lpd_path, port, [*lpd_cache_flags(f"serve-{port}"), *_lpd_extra])
+
+
+def browseruse_dirs(name):
+    # BH_RUNTIME_DIR holds the daemon's unix socket; AF_UNIX paths cap at ~107
+    # bytes, so BENCH_SCRATCH overrides must stay short.
+    return SCRATCH / f"bh-home-{name}", SCRATCH / f"bh-rt-{name}"
+
+
+def browseruse_env(name, endpoint):
+    """Env for one `browser-use` invocation: state dirs, telemetry off, and the
+    engine's CDP endpoint — ws:// is used verbatim via BU_CDP_WS, http://
+    resolves through /json/version via BU_CDP_URL."""
+    home, rt = browseruse_dirs(name)
+    var = "BU_CDP_WS" if endpoint.startswith("ws") else "BU_CDP_URL"
+    return {"BH_HOME": str(home), "BH_RUNTIME_DIR": str(rt),
+            "ANONYMIZED_TELEMETRY": "false", var: endpoint}
+
+
+def browseruse_wipe(name):
+    """Cold isolation: no daemon, no state dirs left from a previous run."""
+    kill_browseruse_daemon(name)
+    for d in browseruse_dirs(name):
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def kill_browseruse_daemon(name):
+    _, rt = browseruse_dirs(name)
+    try:
+        pid = int((rt / "bu.pid").read_text())
+        os.kill(pid, signal.SIGTERM)
+    except (OSError, ValueError):
+        return
+    deadline = time.time() + 3
+    while time.time() < deadline:
+        try:
+            os.kill(pid, 0)
+        except OSError:
+            return
+        time.sleep(0.05)
+    try:
+        os.kill(pid, signal.SIGKILL)
+    except OSError:
+        pass
 
 
 def run_once(cfg, task, mode, lpd_path, chrome_path, held_browsers):
@@ -149,22 +203,63 @@ def run_once(cfg, task, mode, lpd_path, chrome_path, held_browsers):
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env)
         rec["ms"] = (time.perf_counter() - t0) * 1000
     else:
-        runner = sys.executable if driver == "playwright-py" else "node"
-        cmd = [runner, str(script_path(driver, task))]
+        if driver == "browseruse":
+            cmd = [os.environ.get("BROWSER_USE_BIN", "browser-use")]
+            run_kwargs = {"input": script_path(driver, task).read_text()}
+        else:
+            runner = sys.executable if driver == "playwright-py" else "node"
+            cmd = [runner, str(script_path(driver, task))]
+            run_kwargs = {}
         browser = None
         try:
             if mode == "cold":
+                if driver == "browseruse":
+                    browseruse_wipe(name)
+                    # The CLI drives the default browser context, which sees
+                    # the profile's disk cache and cookies — persisting the
+                    # profile would make these cold runs warm-cache. (The
+                    # puppeteer/playwright legs are immune: their incognito
+                    # context's cache dies with the context every run.)
+                    if engine == "chrome":
+                        shutil.rmtree(SCRATCH / f"chrome-profile-{port}", ignore_errors=True)
                 t0 = time.perf_counter()
                 browser = launch_browser(engine, port, lpd_path, chrome_path)
                 rec["launch_ms"] = browser.ready_ms
             else:
                 browser = held_browsers[name]
                 t0 = time.perf_counter()
-            env["BROWSER_WS"] = browser.endpoint
-            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env)
+            if driver == "browseruse":
+                # Cold pays the daemon spawn inside the timer (it is part of
+                # the stack's cold cost); warm reuses the held daemon via the
+                # persistent state dirs.
+                env.update(browseruse_env(name, browser.endpoint))
+            else:
+                env["BROWSER_WS"] = browser.endpoint
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env, **run_kwargs)
             rec["ms"] = (time.perf_counter() - t0) * 1000
+            # A wedged daemon fails every later run in a warm phase (its IPC
+            # recv times out and warm mode never respawns it). Kill it on any
+            # failure so the run is one bad cell, not a cascade; the next run
+            # respawns it against the held browser, which keeps warm state.
+            # The held *tab* can wedge too (ad-heavy pages leave states where
+            # Page.navigate never commits) — after 2 consecutive failures,
+            # recycle the held browser like a pool health check would, and
+            # flag the run so the semi-cold successor rows are attributable.
+            if driver == "browseruse" and mode == "warm":
+                if proc.returncode != 0:
+                    kill_browseruse_daemon(name)
+                    _bu_warm_fails[name] = _bu_warm_fails.get(name, 0) + 1
+                    if _bu_warm_fails[name] >= 2:
+                        held_browsers[name].kill()
+                        held_browsers[name] = launch_browser(engine, port, lpd_path, chrome_path)
+                        rec["browser_recycled"] = True
+                        _bu_warm_fails[name] = 0
+                else:
+                    _bu_warm_fails[name] = 0
         finally:
             if mode == "cold" and browser is not None:
+                if driver == "browseruse":
+                    kill_browseruse_daemon(name)
                 browser.kill()
 
     rec["exit"] = proc.returncode
@@ -232,6 +327,7 @@ def collect_meta(lpd_path, chrome_path, args):
         "lightpanda_binary": binary,
         "chrome": out([chrome_path, "--version"]),
         "node": out(["node", "--version"]),
+        "browser_use": out([os.environ.get("BROWSER_USE_BIN", "browser-use"), "--version"]),
         "npm_deps": npm_versions,
         "python": platform.python_version(),
         "pip_deps": pip_versions,
@@ -268,6 +364,12 @@ def main():
     if args.configs:
         wanted = set(args.configs.split(","))
         configs = [c for c in CONFIGS if c[0] in wanted]
+    if any(c[1] == "browseruse" for c in configs) and not os.environ.get("BROWSER_USE_BIN"):
+        # Under `uv run`, a bare `browser-use` resolves to this venv's 0.12.x
+        # agent CLI (a base dep of the MCP suite), which eats stdin and prints
+        # usage with exit 0 — demand the real binary instead of trusting PATH.
+        sys.exit("browseruse configs need BROWSER_USE_BIN "
+                 "(e.g. ~/.local/bin/browser-use from `uv tool install browser-use`)")
     if args.task == "scrape_par":
         configs = [c for c in configs if c[0] == "pandascript"]
 
@@ -294,6 +396,8 @@ def main():
         for name, driver, engine, port in configs:
             # pandascript and lightpanda-py own their browser process per run.
             if driver not in ("pandascript", "lightpanda-py"):
+                if driver == "browseruse":
+                    browseruse_wipe(name)
                 held[name] = launch_browser(engine, port, lpd_path, chrome_path)
 
     raw = open(out_dir / "raw.jsonl", "a")
@@ -336,11 +440,13 @@ def main():
                 time.sleep(args.pace)
     finally:
         raw.close()
+        for name, driver, engine, port in configs:
+            if driver == "browseruse":
+                kill_browseruse_daemon(name)
         for b in held.values():
             b.kill()
         if fixture is not None:
-            import signal as _signal
-            os.killpg(fixture.pid, _signal.SIGKILL)
+            os.killpg(fixture.pid, signal.SIGKILL)
 
     print(f"done: {out_dir}")
 

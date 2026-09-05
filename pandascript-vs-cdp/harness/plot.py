@@ -27,20 +27,22 @@ NEUTRAL = "#8a897f"  # other configurations (identity lives in the row labels)
 FIRST_PARTY = {"pandascript", "lightpanda-py"}
 
 ROWS = [
-    ("pandascript", "PandaScript replay"),
+    ("pandascript", "PandaScript"),
     ("lightpanda-py", "Python bindings (pip install lightpanda)"),
-    ("puppeteer-lightpanda", "Puppeteer → lightpanda serve"),
-    ("playwright-lightpanda", "Playwright → lightpanda serve"),
-    ("playwright-py-lightpanda", "Playwright-Python → lightpanda serve"),
+    ("puppeteer-lightpanda", "Puppeteer → Lightpanda"),
+    ("playwright-lightpanda", "Playwright → Lightpanda"),
+    ("playwright-py-lightpanda", "Playwright-Python → Lightpanda"),
     ("puppeteer-chrome", "Puppeteer → Chrome"),
     ("playwright-chrome", "Playwright → Chrome"),
     ("playwright-py-chrome", "Playwright-Python → Chrome"),
+    ("browseruse-lightpanda", "browser-use CLI → Lightpanda"),
+    ("browseruse-chrome", "browser-use CLI → Chrome"),
 ]
 
 TASKS = {
-    "scrape": "Hacker News scrape — 6 page loads, live site",
-    "retail": "Retail price monitoring (gymshark.com) — 4 page loads, live site",
-    "news": "News monitoring (apnews.com) — 4 page loads, live site",
+    "scrape": "Hacker News scrape: 6 page loads, live site",
+    "retail": "Retail price monitoring (gymshark.com): 4 page loads, live site",
+    "news": "News monitoring (apnews.com): 4 page loads, live site",
 }
 
 matplotlib.rcParams.update({
@@ -180,7 +182,7 @@ def draw_memory(prefix, fig_prefix=""):
         if config in FIRST_PARTY:
             tick.set_fontweight("bold")
 
-    fig.suptitle("Peak memory over the whole process tree — median of 5 cold runs",
+    fig.suptitle("Peak memory over the whole process tree: median of 5 cold runs",
                  fontsize=11.5, x=0.005, y=1.02, ha="left", color=INK)
     fig.tight_layout()
 

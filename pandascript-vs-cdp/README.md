@@ -9,7 +9,8 @@ and apnews.com, plus a local login fixture.
 Contents:
 
 - `scripts/` — the benchmarked task scripts, one per driver
-  (pandascript / puppeteer / playwright / playwright-py / lightpanda-py)
+  (pandascript / puppeteer / playwright / playwright-py / lightpanda-py /
+  browseruse)
 - `harness/` — `bench.py` (round-robin benchmark orchestrator), `ab.py`
   (variant A/B runner), `report.py` (aggregation), `plot.py` (figures),
   `browsers.py` (browser lifecycle), `login_fixture.py` (local login server),
@@ -55,7 +56,8 @@ Contents:
 
 `pandascript`, `puppeteer-lightpanda`, `puppeteer-chrome`,
 `playwright-lightpanda`, `playwright-chrome`, `playwright-py-lightpanda`,
-`playwright-py-chrome`, `lightpanda-py`. CDP scripts *connect* to a
+`playwright-py-chrome`, `lightpanda-py`, `browseruse-lightpanda`,
+`browseruse-chrome`. CDP scripts *connect* to a
 browser the harness launched (`BROWSER_WS` env: `ws://` for lightpanda,
 `http://` for Chrome); the harness owns the browser lifecycle so cold timing
 can bracket it.
@@ -78,6 +80,24 @@ The two Python legs (deps: `uv sync --group psbench` in the repo root):
   covers interpreter + sidecar together. There is **no `scrape_par`
   variant**: the MCP server dispatches one request at a time, so a parallel
   port would not actually run its page loads concurrently.
+
+The browser-use CLI legs (`scripts/browseruse/`, Python scripts piped into
+the `browser-use` binary):
+
+- **browseruse-\*** — the [browser-use](https://github.com/browser-use/browser-use)
+  CLI (browser-harness). The script is fed on stdin; the CLI spawns a daemon
+  that holds one CDP websocket to the harness-launched engine (its local mode
+  only attaches to a desktop Chrome, so both legs get the engine via
+  `BU_CDP_WS` / `BU_CDP_URL`). Cold runs wipe the daemon and its state dirs
+  (`BH_HOME`, `BH_RUNTIME_DIR`) and, on Chrome, the profile — the CLI drives
+  the default browser context, which sees the profile's disk cache — so the
+  daemon spawn is inside the cold timer; warm runs reuse the held daemon.
+  `BROWSER_USE_BIN` is required (e.g. `~/.local/bin/browser-use` from
+  `uv tool install browser-use`): under `uv run` a bare `browser-use`
+  resolves to the venv's 0.12.x agent CLI, which is not the same program.
+  Scripts fence each navigation on `location.href` changing before any
+  readiness wait, since the CLI's polling waits can otherwise read the
+  previous document.
 
 ## Modes
 
