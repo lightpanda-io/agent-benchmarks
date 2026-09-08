@@ -1,0 +1,35 @@
+{"config": "pandascript", "task": "retail", "peak_pss_mb": 164.80859375, "elapsed_s": 8.834, "cpu_s": 7.105, "ok": true, "iter": 0}
+{"config": "puppeteer-lightpanda", "task": "retail", "peak_pss_mb": 321.984375, "elapsed_s": 5.751, "cpu_s": 5.774, "cpu_engine_s": 4.97, "cpu_driver_s": 0.804, "ok": true, "iter": 0}
+{"config": "puppeteer-chrome", "task": "retail", "peak_pss_mb": 903.8203125, "elapsed_s": 8.764, "cpu_s": 10.934, "cpu_engine_s": 9.1, "cpu_driver_s": 1.834, "ok": true, "iter": 0}
+{"config": "playwright-lightpanda", "task": "retail", "peak_pss_mb": 363.201171875, "elapsed_s": 9.728, "cpu_s": 6.841, "cpu_engine_s": 5.7, "cpu_driver_s": 1.141, "ok": true, "iter": 0}
+{"config": "playwright-chrome", "task": "retail", "peak_pss_mb": 1081.2021484375, "elapsed_s": 4.628, "cpu_s": 11.265, "cpu_engine_s": 8.74, "cpu_driver_s": 2.525, "ok": true, "iter": 0}
+{"config": "browseruse-chrome", "task": "retail", "peak_pss_mb": 761.3935546875, "elapsed_s": 4.852, "cpu_s": 9.186, "cpu_engine_s": 8.43, "cpu_driver_s": 0.756, "ok": true, "iter": 0}
+{"config": "browseruse-lightpanda", "task": "retail", "peak_pss_mb": 325.353515625, "elapsed_s": 10.002, "cpu_s": 6.464, "cpu_engine_s": 5.9, "cpu_driver_s": 0.564, "ok": true, "iter": 0}
+{"config": "pandascript", "task": "retail", "peak_pss_mb": 149.9658203125, "elapsed_s": 5.33, "cpu_s": 5.989, "ok": true, "iter": 1}
+{"config": "puppeteer-lightpanda", "task": "retail", "peak_pss_mb": 337.783203125, "elapsed_s": 5.754, "cpu_s": 6.075, "cpu_engine_s": 5.29, "cpu_driver_s": 0.785, "ok": true, "iter": 1}
+{"config": "puppeteer-chrome", "task": "retail", "peak_pss_mb": 970.9013671875, "elapsed_s": 4.148, "cpu_s": 9.547, "cpu_engine_s": 7.88, "cpu_driver_s": 1.667, "ok": true, "iter": 1}
+{"config": "playwright-lightpanda", "task": "retail", "peak_pss_mb": 360.669921875, "elapsed_s": 5.542, "cpu_s": 6.522, "cpu_engine_s": 5.43, "cpu_driver_s": 1.092, "ok": true, "iter": 1}
+{"config": "playwright-chrome", "task": "retail", "peak_pss_mb": 1077.740234375, "elapsed_s": 4.304, "cpu_s": 10.944, "cpu_engine_s": 8.5, "cpu_driver_s": 2.444, "ok": true, "iter": 1}
+{"config": "browseruse-chrome", "task": "retail", "peak_pss_mb": 728.4951171875, "elapsed_s": 4.611, "cpu_s": 9.255, "cpu_engine_s": 8.47, "cpu_driver_s": 0.785, "ok": true, "iter": 1}
+{"config": "browseruse-lightpanda", "task": "retail", "peak_pss_mb": 331.7001953125, "elapsed_s": 5.593, "cpu_s": 5.977, "cpu_engine_s": 5.48, "cpu_driver_s": 0.497, "ok": true, "iter": 1}
+{"config": "pandascript", "task": "retail", "peak_pss_mb": 148.876953125, "elapsed_s": 3.665, "cpu_s": 5.757, "ok": true, "iter": 2}
+{"config": "puppeteer-lightpanda", "task": "retail", "peak_pss_mb": 337.6640625, "elapsed_s": 6.123, "cpu_s": 6.186, "cpu_engine_s": 5.33, "cpu_driver_s": 0.856, "ok": true, "iter": 2}
+{"config": "puppeteer-chrome", "task": "retail", "peak_pss_mb": 912.783203125, "elapsed_s": 3.945, "cpu_s": 9.395, "cpu_engine_s": 7.7, "cpu_driver_s": 1.695, "ok": true, "iter": 2}
+{"config": "playwright-lightpanda", "task": "retail", "peak_pss_mb": 361.6357421875, "elapsed_s": 5.569, "cpu_s": 6.354, "cpu_engine_s": 5.27, "cpu_driver_s": 1.084, "ok": true, "iter": 2}
+{"config": "playwright-chrome", "task": "retail", "peak_pss_mb": 1047.13671875, "elapsed_s": 4.253, "cpu_s": 10.994, "cpu_engine_s": 8.55, "cpu_driver_s": 2.444, "ok": true, "iter": 2}
+{"config": "browseruse-chrome", "task": "retail", "peak_pss_mb": 763.5009765625, "elapsed_s": 4.154, "cpu_s": 8.635, "cpu_engine_s": 7.82, "cpu_driver_s": 0.815, "ok": true, "iter": 2}
+{"config": "browseruse-lightpanda", "task": "retail", "peak_pss_mb": 326.0458984375, "elapsed_s": 5.214, "cpu_s": 5.986, "cpu_engine_s": 5.43, "cpu_driver_s": 0.556, "ok": true, "iter": 2}
+{"config": "pandascript", "task": "retail", "peak_pss_mb": 162.83203125, "elapsed_s": 10.572, "cpu_s": 6.476, "ok": true, "iter": 3}
+{"config": "puppeteer-lightpanda", "task": "retail", "peak_pss_mb": 354.3056640625, "elapsed_s": 9.204, "cpu_s": 6.716, "cpu_engine_s": 5.8, "cpu_driver_s": 0.916, "ok": true, "iter": 3}
+{"config": "puppeteer-chrome", "task": "retail", "peak_pss_mb": 922.7578125, "elapsed_s": 4.778, "cpu_s": 10.084, "cpu_engine_s": 8.18, "cpu_driver_s": 1.904, "ok": true, "iter": 3}
+{"config": "playwright-lightpanda", "task": "retail", "peak_pss_mb": 362.1796875, "elapsed_s": 5.597, "cpu_s": 6.254, "cpu_engine_s": 5.14, "cpu_driver_s": 1.114, "ok": true, "iter": 3}
+{"config": "playwright-chrome", "task": "retail", "peak_pss_mb": 1051.091796875, "elapsed_s": 4.078, "cpu_s": 10.965, "cpu_engine_s": 8.48, "cpu_driver_s": 2.485, "ok": true, "iter": 3}
+{"config": "browseruse-chrome", "task": "retail", "peak_pss_mb": 759.6337890625, "elapsed_s": 4.673, "cpu_s": 8.761, "cpu_engine_s": 8.04, "cpu_driver_s": 0.721, "ok": true, "iter": 3}
+{"config": "browseruse-lightpanda", "task": "retail", "peak_pss_mb": 334.8544921875, "elapsed_s": 10.014, "cpu_s": 6.376, "cpu_engine_s": 5.79, "cpu_driver_s": 0.586, "ok": true, "iter": 3}
+{"config": "pandascript", "task": "retail", "peak_pss_mb": 144.28125, "elapsed_s": 5.675, "cpu_s": 5.51, "ok": true, "iter": 4}
+{"config": "puppeteer-lightpanda", "task": "retail", "peak_pss_mb": 344.708984375, "elapsed_s": 5.439, "cpu_s": 6.036, "cpu_engine_s": 5.26, "cpu_driver_s": 0.776, "ok": true, "iter": 4}
+{"config": "puppeteer-chrome", "task": "retail", "peak_pss_mb": 935.51171875, "elapsed_s": 3.942, "cpu_s": 9.437, "cpu_engine_s": 7.75, "cpu_driver_s": 1.687, "ok": true, "iter": 4}
+{"config": "playwright-lightpanda", "task": "retail", "peak_pss_mb": 360.6533203125, "elapsed_s": 4.641, "cpu_s": 6.141, "cpu_engine_s": 5.12, "cpu_driver_s": 1.021, "ok": true, "iter": 4}
+{"config": "playwright-chrome", "task": "retail", "peak_pss_mb": 1026.208984375, "elapsed_s": 3.839, "cpu_s": 9.99, "cpu_engine_s": 7.69, "cpu_driver_s": 2.3, "ok": true, "iter": 4}
+{"config": "browseruse-chrome", "task": "retail", "peak_pss_mb": 745.6533203125, "elapsed_s": 4.119, "cpu_s": 8.317, "cpu_engine_s": 7.65, "cpu_driver_s": 0.667, "ok": true, "iter": 4}
+{"config": "browseruse-lightpanda", "task": "retail", "peak_pss_mb": 331.216796875, "elapsed_s": 5.207, "cpu_s": 5.878, "cpu_engine_s": 5.42, "cpu_driver_s": 0.458, "ok": true, "iter": 4}

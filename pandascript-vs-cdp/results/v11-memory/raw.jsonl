@@ -1,0 +1,140 @@
+{"config": "pandascript", "task": "scrape", "peak_pss_mb": 39.85546875, "elapsed_s": 2.385, "cpu_s": 0.159, "ok": true, "iter": 0}
+{"config": "puppeteer-lightpanda", "task": "scrape", "peak_pss_mb": 121.9013671875, "elapsed_s": 2.318, "cpu_s": 0.678, "cpu_engine_s": 0.12, "cpu_driver_s": 0.558, "ok": true, "iter": 0}
+{"config": "puppeteer-chrome", "task": "scrape", "peak_pss_mb": 572.39453125, "elapsed_s": 3.02, "cpu_s": 3.044, "cpu_engine_s": 2.27, "cpu_driver_s": 0.774, "ok": true, "iter": 0}
+{"config": "playwright-lightpanda", "task": "scrape", "peak_pss_mb": 138.6298828125, "elapsed_s": 3.202, "cpu_s": 0.748, "cpu_engine_s": 0.16, "cpu_driver_s": 0.588, "ok": true, "iter": 0}
+{"config": "playwright-chrome", "task": "scrape", "peak_pss_mb": 654.625, "elapsed_s": 3.182, "cpu_s": 3.327, "cpu_engine_s": 2.34, "cpu_driver_s": 0.987, "ok": true, "iter": 0}
+{"config": "browseruse-chrome", "task": "scrape", "peak_pss_mb": 434.287109375, "elapsed_s": 3.039, "cpu_s": 2.332, "cpu_engine_s": 1.82, "cpu_driver_s": 0.512, "ok": true, "iter": 0}
+{"config": "browseruse-lightpanda", "task": "scrape", "peak_pss_mb": 102.4970703125, "elapsed_s": 2.49, "cpu_s": 0.455, "cpu_engine_s": 0.07, "cpu_driver_s": 0.385, "ok": true, "iter": 0}
+{"config": "pandascript", "task": "scrape", "peak_pss_mb": 39.8115234375, "elapsed_s": 2.374, "cpu_s": 0.171, "ok": true, "iter": 1}
+{"config": "puppeteer-lightpanda", "task": "scrape", "peak_pss_mb": 124.5107421875, "elapsed_s": 2.743, "cpu_s": 0.691, "cpu_engine_s": 0.11, "cpu_driver_s": 0.581, "ok": true, "iter": 1}
+{"config": "puppeteer-chrome", "task": "scrape", "peak_pss_mb": 567.869140625, "elapsed_s": 3.069, "cpu_s": 2.971, "cpu_engine_s": 2.17, "cpu_driver_s": 0.801, "ok": true, "iter": 1}
+{"config": "playwright-lightpanda", "task": "scrape", "peak_pss_mb": 140.6240234375, "elapsed_s": 2.562, "cpu_s": 0.806, "cpu_engine_s": 0.17, "cpu_driver_s": 0.636, "ok": true, "iter": 1}
+{"config": "playwright-chrome", "task": "scrape", "peak_pss_mb": 643.306640625, "elapsed_s": 3.334, "cpu_s": 3.379, "cpu_engine_s": 2.45, "cpu_driver_s": 0.929, "ok": true, "iter": 1}
+{"config": "browseruse-chrome", "task": "scrape", "peak_pss_mb": 418.822265625, "elapsed_s": 2.995, "cpu_s": 2.178, "cpu_engine_s": 1.7, "cpu_driver_s": 0.478, "ok": true, "iter": 1}
+{"config": "browseruse-lightpanda", "task": "scrape", "peak_pss_mb": 103.517578125, "elapsed_s": 2.505, "cpu_s": 0.39, "cpu_engine_s": 0.07, "cpu_driver_s": 0.32, "ok": true, "iter": 1}
+{"config": "pandascript", "task": "scrape", "peak_pss_mb": 39.1572265625, "elapsed_s": 2.172, "cpu_s": 0.126, "ok": true, "iter": 2}
+{"config": "puppeteer-lightpanda", "task": "scrape", "peak_pss_mb": 121.6318359375, "elapsed_s": 2.28, "cpu_s": 0.616, "cpu_engine_s": 0.13, "cpu_driver_s": 0.486, "ok": true, "iter": 2}
+{"config": "puppeteer-chrome", "task": "scrape", "peak_pss_mb": 570.39453125, "elapsed_s": 2.817, "cpu_s": 2.868, "cpu_engine_s": 2.2, "cpu_driver_s": 0.668, "ok": true, "iter": 2}
+{"config": "playwright-lightpanda", "task": "scrape", "peak_pss_mb": 139.2109375, "elapsed_s": 2.993, "cpu_s": 0.818, "cpu_engine_s": 0.17, "cpu_driver_s": 0.648, "ok": true, "iter": 2}
+{"config": "playwright-chrome", "task": "scrape", "peak_pss_mb": 653.8505859375, "elapsed_s": 3.183, "cpu_s": 3.436, "cpu_engine_s": 2.57, "cpu_driver_s": 0.866, "ok": true, "iter": 2}
+{"config": "browseruse-chrome", "task": "scrape", "peak_pss_mb": 432.4892578125, "elapsed_s": 13.433, "cpu_s": 2.627, "cpu_engine_s": 2.19, "cpu_driver_s": 0.437, "ok": true, "iter": 2}
+{"config": "browseruse-lightpanda", "task": "scrape", "peak_pss_mb": 103.4619140625, "elapsed_s": 2.929, "cpu_s": 0.437, "cpu_engine_s": 0.08, "cpu_driver_s": 0.357, "ok": true, "iter": 2}
+{"config": "pandascript", "task": "scrape", "peak_pss_mb": 39.158203125, "elapsed_s": 2.496, "cpu_s": 0.141, "ok": true, "iter": 3}
+{"config": "puppeteer-lightpanda", "task": "scrape", "peak_pss_mb": 120.2294921875, "elapsed_s": 2.136, "cpu_s": 0.621, "cpu_engine_s": 0.11, "cpu_driver_s": 0.511, "ok": true, "iter": 3}
+{"config": "puppeteer-chrome", "task": "scrape", "peak_pss_mb": 575.2099609375, "elapsed_s": 2.775, "cpu_s": 2.972, "cpu_engine_s": 2.19, "cpu_driver_s": 0.782, "ok": true, "iter": 3}
+{"config": "playwright-lightpanda", "task": "scrape", "peak_pss_mb": 140.57421875, "elapsed_s": 2.977, "cpu_s": 0.801, "cpu_engine_s": 0.17, "cpu_driver_s": 0.631, "ok": true, "iter": 3}
+{"config": "playwright-chrome", "task": "scrape", "peak_pss_mb": 642.419921875, "elapsed_s": 2.995, "cpu_s": 3.332, "cpu_engine_s": 2.4, "cpu_driver_s": 0.932, "ok": true, "iter": 3}
+{"config": "browseruse-chrome", "task": "scrape", "peak_pss_mb": 423.935546875, "elapsed_s": 2.671, "cpu_s": 2.25, "cpu_engine_s": 1.82, "cpu_driver_s": 0.43, "ok": true, "iter": 3}
+{"config": "browseruse-lightpanda", "task": "scrape", "peak_pss_mb": 103.1416015625, "elapsed_s": 2.535, "cpu_s": 0.498, "cpu_engine_s": 0.09, "cpu_driver_s": 0.408, "ok": true, "iter": 3}
+{"config": "pandascript", "task": "scrape", "peak_pss_mb": 39.1630859375, "elapsed_s": 2.173, "cpu_s": 0.138, "ok": true, "iter": 4}
+{"config": "puppeteer-lightpanda", "task": "scrape", "peak_pss_mb": 120.7998046875, "elapsed_s": 2.854, "cpu_s": 0.667, "cpu_engine_s": 0.1, "cpu_driver_s": 0.567, "ok": true, "iter": 4}
+{"config": "puppeteer-chrome", "task": "scrape", "peak_pss_mb": 571.408203125, "elapsed_s": 3.125, "cpu_s": 3.082, "cpu_engine_s": 2.38, "cpu_driver_s": 0.702, "ok": true, "iter": 4}
+{"config": "playwright-lightpanda", "task": "scrape", "peak_pss_mb": 140.3740234375, "elapsed_s": 2.438, "cpu_s": 0.739, "cpu_engine_s": 0.13, "cpu_driver_s": 0.609, "ok": true, "iter": 4}
+{"config": "playwright-chrome", "task": "scrape", "peak_pss_mb": 667.0244140625, "elapsed_s": 2.678, "cpu_s": 3.434, "cpu_engine_s": 2.51, "cpu_driver_s": 0.924, "ok": true, "iter": 4}
+{"config": "browseruse-chrome", "task": "scrape", "peak_pss_mb": 430.671875, "elapsed_s": 3.292, "cpu_s": 2.313, "cpu_engine_s": 1.87, "cpu_driver_s": 0.443, "ok": true, "iter": 4}
+{"config": "browseruse-lightpanda", "task": "scrape", "peak_pss_mb": 103.3388671875, "elapsed_s": 2.875, "cpu_s": 0.412, "cpu_engine_s": 0.07, "cpu_driver_s": 0.342, "ok": true, "iter": 4}
+{"config": "pandascript", "task": "retail", "peak_pss_mb": 178.94921875, "elapsed_s": 6.035, "cpu_s": 5.427, "ok": true, "iter": 0}
+{"config": "puppeteer-lightpanda", "task": "retail", "peak_pss_mb": 927.775390625, "elapsed_s": 12.643, "cpu_s": 14.889, "cpu_engine_s": 13.71, "cpu_driver_s": 1.179, "ok": true, "iter": 0}
+{"config": "puppeteer-chrome", "task": "retail", "peak_pss_mb": 1148.6103515625, "elapsed_s": 6.524, "cpu_s": 8.729, "cpu_engine_s": 7.75, "cpu_driver_s": 0.979, "ok": true, "iter": 0}
+{"config": "playwright-lightpanda", "task": "retail", "peak_pss_mb": 869.76953125, "elapsed_s": 11.861, "cpu_s": 15.495, "cpu_engine_s": 14.3, "cpu_driver_s": 1.195, "ok": true, "iter": 0}
+{"config": "playwright-chrome", "task": "retail", "peak_pss_mb": 1566.986328125, "elapsed_s": 5.13, "cpu_s": 10.3, "cpu_engine_s": 8.71, "cpu_driver_s": 1.59, "ok": true, "iter": 0}
+{"config": "browseruse-chrome", "task": "retail", "peak_pss_mb": 779.2177734375, "elapsed_s": 3.456, "cpu_s": 6.121, "cpu_engine_s": 5.64, "cpu_driver_s": 0.481, "ok": true, "iter": 0}
+{"config": "browseruse-lightpanda", "task": "retail", "peak_pss_mb": 854.6513671875, "elapsed_s": 12.496, "cpu_s": 13.843, "cpu_engine_s": 13.35, "cpu_driver_s": 0.493, "ok": true, "iter": 0}
+{"config": "pandascript", "task": "retail", "peak_pss_mb": 198.546875, "elapsed_s": 5.235, "cpu_s": 5.7, "ok": true, "iter": 1}
+{"config": "puppeteer-lightpanda", "task": "retail", "peak_pss_mb": 582.7392578125, "elapsed_s": 8.06, "cpu_s": 9.434, "cpu_engine_s": 8.75, "cpu_driver_s": 0.684, "ok": true, "iter": 1}
+{"config": "puppeteer-chrome", "task": "retail", "peak_pss_mb": 1147.7275390625, "elapsed_s": 6.824, "cpu_s": 9.066, "cpu_engine_s": 8.01, "cpu_driver_s": 1.056, "ok": true, "iter": 1}
+{"config": "playwright-lightpanda", "task": "retail", "peak_pss_mb": 534.0693359375, "elapsed_s": 7.012, "cpu_s": 8.302, "cpu_engine_s": 7.42, "cpu_driver_s": 0.882, "ok": true, "iter": 1}
+{"config": "playwright-chrome", "task": "retail", "peak_pss_mb": 1261.5673828125, "elapsed_s": 3.212, "cpu_s": 8.976, "cpu_engine_s": 7.47, "cpu_driver_s": 1.506, "ok": true, "iter": 1}
+{"config": "browseruse-chrome", "task": "retail", "peak_pss_mb": 924.1171875, "elapsed_s": 5.776, "cpu_s": 7.449, "cpu_engine_s": 6.87, "cpu_driver_s": 0.579, "ok": true, "iter": 1}
+{"config": "browseruse-lightpanda", "task": "retail", "peak_pss_mb": 538.6689453125, "elapsed_s": 6.049, "cpu_s": 8.304, "cpu_engine_s": 7.89, "cpu_driver_s": 0.414, "ok": true, "iter": 1}
+{"config": "pandascript", "task": "retail", "peak_pss_mb": 189.2353515625, "elapsed_s": 6.165, "cpu_s": 5.602, "ok": true, "iter": 2}
+{"config": "puppeteer-lightpanda", "task": "retail", "peak_pss_mb": 914.0263671875, "elapsed_s": 8.638, "cpu_s": 12.147, "cpu_engine_s": 11.23, "cpu_driver_s": 0.917, "ok": false, "error": "expected 3 products, got 0", "iter": 2}
+{"config": "puppeteer-chrome", "task": "retail", "peak_pss_mb": 1121.5498046875, "elapsed_s": 6.255, "cpu_s": 9.262, "cpu_engine_s": 8.18, "cpu_driver_s": 1.082, "ok": true, "iter": 2}
+{"config": "playwright-lightpanda", "task": "retail", "peak_pss_mb": 688.3369140625, "elapsed_s": 6.623, "cpu_s": 10.043, "cpu_engine_s": 9.1, "cpu_driver_s": 0.943, "ok": true, "iter": 2}
+{"config": "playwright-chrome", "task": "retail", "peak_pss_mb": 1580.3212890625, "elapsed_s": 6.749, "cpu_s": 10.792, "cpu_engine_s": 9.02, "cpu_driver_s": 1.772, "ok": true, "iter": 2}
+{"config": "browseruse-chrome", "task": "retail", "peak_pss_mb": 762.974609375, "elapsed_s": 2.532, "cpu_s": 5.29, "cpu_engine_s": 4.77, "cpu_driver_s": 0.52, "ok": true, "iter": 2}
+{"config": "browseruse-lightpanda", "task": "retail", "peak_pss_mb": 650.916015625, "elapsed_s": 6.321, "cpu_s": 7.704, "cpu_engine_s": 7.24, "cpu_driver_s": 0.464, "ok": false, "error": "expected 3 products, got 0", "iter": 2}
+{"config": "pandascript", "task": "retail", "peak_pss_mb": 202.5400390625, "elapsed_s": 2.618, "cpu_s": 5.752, "ok": true, "iter": 3}
+{"config": "puppeteer-lightpanda", "task": "retail", "peak_pss_mb": 908.9306640625, "elapsed_s": 8.803, "cpu_s": 12.461, "cpu_engine_s": 11.63, "cpu_driver_s": 0.831, "ok": true, "iter": 3}
+{"config": "puppeteer-chrome", "task": "retail", "peak_pss_mb": 1149.6103515625, "elapsed_s": 5.362, "cpu_s": 8.899, "cpu_engine_s": 7.8, "cpu_driver_s": 1.099, "ok": true, "iter": 3}
+{"config": "playwright-lightpanda", "task": "retail", "peak_pss_mb": 759.7880859375, "elapsed_s": 9.926, "cpu_s": 12.266, "cpu_engine_s": 11.13, "cpu_driver_s": 1.136, "ok": true, "iter": 3}
+{"config": "playwright-chrome", "task": "retail", "peak_pss_mb": 1375.68359375, "elapsed_s": 3.133, "cpu_s": 8.882, "cpu_engine_s": 7.43, "cpu_driver_s": 1.452, "ok": true, "iter": 3}
+{"config": "browseruse-chrome", "task": "retail", "peak_pss_mb": 924.6787109375, "elapsed_s": 5.329, "cpu_s": 7.967, "cpu_engine_s": 7.35, "cpu_driver_s": 0.617, "ok": true, "iter": 3}
+{"config": "browseruse-lightpanda", "task": "retail", "peak_pss_mb": 621.9736328125, "elapsed_s": 6.672, "cpu_s": 9.447, "cpu_engine_s": 8.99, "cpu_driver_s": 0.457, "ok": true, "iter": 3}
+{"config": "pandascript", "task": "retail", "peak_pss_mb": 512.8173828125, "elapsed_s": 13.633, "cpu_s": 26.227, "ok": true, "iter": 4}
+{"config": "puppeteer-lightpanda", "task": "retail", "peak_pss_mb": 694.5966796875, "elapsed_s": 12.439, "cpu_s": 16.535, "cpu_engine_s": 15.52, "cpu_driver_s": 1.015, "ok": true, "iter": 4}
+{"config": "puppeteer-chrome", "task": "retail", "peak_pss_mb": 990.2451171875, "elapsed_s": 2.589, "cpu_s": 6.971, "cpu_engine_s": 5.83, "cpu_driver_s": 1.141, "ok": true, "iter": 4}
+{"config": "playwright-lightpanda", "task": "retail", "peak_pss_mb": 474.7197265625, "elapsed_s": 4.374, "cpu_s": 6.834, "cpu_engine_s": 6.04, "cpu_driver_s": 0.794, "ok": true, "iter": 4}
+{"config": "playwright-chrome", "task": "retail", "peak_pss_mb": 1397.455078125, "elapsed_s": 3.265, "cpu_s": 9.151, "cpu_engine_s": 7.68, "cpu_driver_s": 1.471, "ok": true, "iter": 4}
+{"config": "browseruse-chrome", "task": "retail", "peak_pss_mb": 703.798828125, "elapsed_s": 2.118, "cpu_s": 4.429, "cpu_engine_s": 3.97, "cpu_driver_s": 0.459, "ok": true, "iter": 4}
+{"config": "browseruse-lightpanda", "task": "retail", "peak_pss_mb": 634.0107421875, "elapsed_s": 5.644, "cpu_s": 7.582, "cpu_engine_s": 7.11, "cpu_driver_s": 0.472, "ok": false, "error": "expected 3 products, got 0", "iter": 4}
+{"config": "pandascript", "task": "news", "peak_pss_mb": 239.1650390625, "elapsed_s": 4.397, "cpu_s": 6.479, "ok": true, "iter": 0}
+{"config": "puppeteer-lightpanda", "task": "news", "peak_pss_mb": 512.7900390625, "elapsed_s": 5.579, "cpu_s": 6.676, "cpu_engine_s": 5.7, "cpu_driver_s": 0.976, "ok": true, "iter": 0}
+{"config": "puppeteer-chrome", "task": "news", "peak_pss_mb": 953.515625, "elapsed_s": 4.231, "cpu_s": 9.99, "cpu_engine_s": 8.47, "cpu_driver_s": 1.52, "ok": true, "iter": 0}
+{"config": "playwright-lightpanda", "task": "news", "peak_pss_mb": 518.6083984375, "elapsed_s": 8.178, "cpu_s": 7.417, "cpu_engine_s": 6.42, "cpu_driver_s": 0.997, "ok": true, "iter": 0}
+{"config": "playwright-chrome", "task": "news", "peak_pss_mb": 1051.34765625, "elapsed_s": 3.985, "cpu_s": 9.268, "cpu_engine_s": 7.5, "cpu_driver_s": 1.768, "ok": true, "iter": 0}
+{"config": "browseruse-chrome", "task": "news", "peak_pss_mb": 775.419921875, "elapsed_s": 7.965, "cpu_s": 9.013, "cpu_engine_s": 8.37, "cpu_driver_s": 0.643, "ok": true, "iter": 0}
+{"config": "browseruse-lightpanda", "task": "news", "peak_pss_mb": 492.6171875, "elapsed_s": 6.383, "cpu_s": 6.569, "cpu_engine_s": 6.05, "cpu_driver_s": 0.519, "ok": true, "iter": 0}
+{"config": "pandascript", "task": "news", "peak_pss_mb": 242.6962890625, "elapsed_s": 9.002, "cpu_s": 6.638, "ok": true, "iter": 1}
+{"config": "puppeteer-lightpanda", "task": "news", "peak_pss_mb": 512.08203125, "elapsed_s": 10.796, "cpu_s": 6.862, "cpu_engine_s": 5.92, "cpu_driver_s": 0.942, "ok": true, "iter": 1}
+{"config": "puppeteer-chrome", "task": "news", "peak_pss_mb": 976.3115234375, "elapsed_s": 4.463, "cpu_s": 10.501, "cpu_engine_s": 9.0, "cpu_driver_s": 1.501, "ok": true, "iter": 1}
+{"config": "playwright-lightpanda", "task": "news", "peak_pss_mb": 515.4326171875, "elapsed_s": 6.013, "cpu_s": 7.054, "cpu_engine_s": 6.05, "cpu_driver_s": 1.004, "ok": true, "iter": 1}
+{"config": "playwright-chrome", "task": "news", "peak_pss_mb": 967.7158203125, "elapsed_s": 3.944, "cpu_s": 9.047, "cpu_engine_s": 7.4, "cpu_driver_s": 1.647, "ok": true, "iter": 1}
+{"config": "browseruse-chrome", "task": "news", "peak_pss_mb": 754.00390625, "elapsed_s": 8.436, "cpu_s": 9.473, "cpu_engine_s": 8.78, "cpu_driver_s": 0.693, "ok": true, "iter": 1}
+{"config": "browseruse-lightpanda", "task": "news", "peak_pss_mb": 452.9111328125, "elapsed_s": 6.057, "cpu_s": 6.099, "cpu_engine_s": 5.63, "cpu_driver_s": 0.469, "ok": true, "iter": 1}
+{"config": "pandascript", "task": "news", "peak_pss_mb": 252.94921875, "elapsed_s": 5.384, "cpu_s": 6.244, "ok": true, "iter": 2}
+{"config": "puppeteer-lightpanda", "task": "news", "peak_pss_mb": 510.720703125, "elapsed_s": 9.087, "cpu_s": 6.771, "cpu_engine_s": 5.92, "cpu_driver_s": 0.851, "ok": true, "iter": 2}
+{"config": "puppeteer-chrome", "task": "news", "peak_pss_mb": 1009.001953125, "elapsed_s": 4.493, "cpu_s": 9.823, "cpu_engine_s": 8.34, "cpu_driver_s": 1.483, "ok": true, "iter": 2}
+{"config": "playwright-lightpanda", "task": "news", "peak_pss_mb": 510.62109375, "elapsed_s": 6.09, "cpu_s": 7.128, "cpu_engine_s": 6.11, "cpu_driver_s": 1.018, "ok": true, "iter": 2}
+{"config": "playwright-chrome", "task": "news", "peak_pss_mb": 1019.578125, "elapsed_s": 8.407, "cpu_s": 10.183, "cpu_engine_s": 8.35, "cpu_driver_s": 1.833, "ok": true, "iter": 2}
+{"config": "browseruse-chrome", "task": "news", "peak_pss_mb": 778.8837890625, "elapsed_s": 8.033, "cpu_s": 8.936, "cpu_engine_s": 8.26, "cpu_driver_s": 0.676, "ok": true, "iter": 2}
+{"config": "browseruse-lightpanda", "task": "news", "peak_pss_mb": 490.103515625, "elapsed_s": 6.238, "cpu_s": 6.509, "cpu_engine_s": 5.97, "cpu_driver_s": 0.539, "ok": true, "iter": 2}
+{"config": "pandascript", "task": "news", "peak_pss_mb": 241.1953125, "elapsed_s": 4.19, "cpu_s": 6.74, "ok": true, "iter": 3}
+{"config": "puppeteer-lightpanda", "task": "news", "peak_pss_mb": 518.5810546875, "elapsed_s": 10.18, "cpu_s": 6.606, "cpu_engine_s": 5.67, "cpu_driver_s": 0.936, "ok": true, "iter": 3}
+{"config": "puppeteer-chrome", "task": "news", "peak_pss_mb": 1024.62109375, "elapsed_s": 8.889, "cpu_s": 9.898, "cpu_engine_s": 8.42, "cpu_driver_s": 1.478, "ok": true, "iter": 3}
+{"config": "playwright-lightpanda", "task": "news", "peak_pss_mb": 521.4375, "elapsed_s": 11.409, "cpu_s": 7.535, "cpu_engine_s": 6.45, "cpu_driver_s": 1.085, "ok": true, "iter": 3}
+{"config": "playwright-chrome", "task": "news", "peak_pss_mb": 958.091796875, "elapsed_s": 8.361, "cpu_s": 9.315, "cpu_engine_s": 7.55, "cpu_driver_s": 1.765, "ok": true, "iter": 3}
+{"config": "browseruse-chrome", "task": "news", "peak_pss_mb": 775.5244140625, "elapsed_s": 4.572, "cpu_s": 8.334, "cpu_engine_s": 7.71, "cpu_driver_s": 0.624, "ok": true, "iter": 3}
+{"config": "browseruse-lightpanda", "task": "news", "peak_pss_mb": 452.982421875, "elapsed_s": 9.941, "cpu_s": 5.931, "cpu_engine_s": 5.43, "cpu_driver_s": 0.501, "ok": true, "iter": 3}
+{"config": "pandascript", "task": "news", "peak_pss_mb": 229.1708984375, "elapsed_s": 3.695, "cpu_s": 6.27, "ok": true, "iter": 4}
+{"config": "puppeteer-lightpanda", "task": "news", "peak_pss_mb": 511.6142578125, "elapsed_s": 5.608, "cpu_s": 6.749, "cpu_engine_s": 5.79, "cpu_driver_s": 0.959, "ok": true, "iter": 4}
+{"config": "puppeteer-chrome", "task": "news", "peak_pss_mb": 999.224609375, "elapsed_s": 3.96, "cpu_s": 8.747, "cpu_engine_s": 7.25, "cpu_driver_s": 1.497, "ok": true, "iter": 4}
+{"config": "playwright-lightpanda", "task": "news", "peak_pss_mb": 518.0732421875, "elapsed_s": 6.174, "cpu_s": 7.251, "cpu_engine_s": 6.33, "cpu_driver_s": 0.921, "ok": true, "iter": 4}
+{"config": "playwright-chrome", "task": "news", "peak_pss_mb": 990.71875, "elapsed_s": 4.36, "cpu_s": 10.127, "cpu_engine_s": 8.26, "cpu_driver_s": 1.867, "ok": true, "iter": 4}
+{"config": "browseruse-chrome", "task": "news", "peak_pss_mb": 793.193359375, "elapsed_s": 4.457, "cpu_s": 8.868, "cpu_engine_s": 8.18, "cpu_driver_s": 0.688, "ok": true, "iter": 4}
+{"config": "browseruse-lightpanda", "task": "news", "peak_pss_mb": 490.029296875, "elapsed_s": 6.396, "cpu_s": 6.297, "cpu_engine_s": 5.82, "cpu_driver_s": 0.477, "ok": true, "iter": 4}
+{"config": "pandascript", "task": "login_fx", "peak_pss_mb": 32.3994140625, "elapsed_s": 0.038, "cpu_s": 0.058, "ok": true, "iter": 0}
+{"config": "puppeteer-lightpanda", "task": "login_fx", "peak_pss_mb": 103.1015625, "elapsed_s": 0.257, "cpu_s": 0.391, "cpu_engine_s": 0.04, "cpu_driver_s": 0.351, "ok": true, "iter": 0}
+{"config": "puppeteer-chrome", "task": "login_fx", "peak_pss_mb": 486.201171875, "elapsed_s": 0.505, "cpu_s": 2.078, "cpu_engine_s": 1.39, "cpu_driver_s": 0.688, "ok": true, "iter": 0}
+{"config": "playwright-lightpanda", "task": "login_fx", "peak_pss_mb": 122.931640625, "elapsed_s": 0.249, "cpu_s": 0.558, "cpu_engine_s": 0.07, "cpu_driver_s": 0.488, "ok": true, "iter": 0}
+{"config": "playwright-chrome", "task": "login_fx", "peak_pss_mb": 535.7080078125, "elapsed_s": 0.444, "cpu_s": 2.303, "cpu_engine_s": 1.64, "cpu_driver_s": 0.663, "ok": true, "iter": 0}
+{"config": "browseruse-chrome", "task": "login_fx", "peak_pss_mb": 403.6279296875, "elapsed_s": 0.82, "cpu_s": 1.671, "cpu_engine_s": 1.24, "cpu_driver_s": 0.431, "ok": true, "iter": 0}
+{"config": "browseruse-lightpanda", "task": "login_fx", "peak_pss_mb": 95.8935546875, "elapsed_s": 0.717, "cpu_s": 0.347, "cpu_engine_s": 0.02, "cpu_driver_s": 0.327, "ok": true, "iter": 0}
+{"config": "pandascript", "task": "login_fx", "peak_pss_mb": 14.912109375, "elapsed_s": 0.029, "cpu_s": 0.029, "ok": true, "iter": 1}
+{"config": "puppeteer-lightpanda", "task": "login_fx", "peak_pss_mb": 103.1796875, "elapsed_s": 0.236, "cpu_s": 0.355, "cpu_engine_s": 0.04, "cpu_driver_s": 0.315, "ok": true, "iter": 1}
+{"config": "puppeteer-chrome", "task": "login_fx", "peak_pss_mb": 488.3701171875, "elapsed_s": 0.485, "cpu_s": 1.921, "cpu_engine_s": 1.32, "cpu_driver_s": 0.601, "ok": true, "iter": 1}
+{"config": "playwright-lightpanda", "task": "login_fx", "peak_pss_mb": 122.9228515625, "elapsed_s": 0.246, "cpu_s": 0.563, "cpu_engine_s": 0.07, "cpu_driver_s": 0.493, "ok": true, "iter": 1}
+{"config": "playwright-chrome", "task": "login_fx", "peak_pss_mb": 527.2705078125, "elapsed_s": 0.439, "cpu_s": 2.283, "cpu_engine_s": 1.62, "cpu_driver_s": 0.663, "ok": true, "iter": 1}
+{"config": "browseruse-chrome", "task": "login_fx", "peak_pss_mb": 407.298828125, "elapsed_s": 0.81, "cpu_s": 1.58, "cpu_engine_s": 1.14, "cpu_driver_s": 0.44, "ok": true, "iter": 1}
+{"config": "browseruse-lightpanda", "task": "login_fx", "peak_pss_mb": 96.2705078125, "elapsed_s": 0.757, "cpu_s": 0.426, "cpu_engine_s": 0.03, "cpu_driver_s": 0.396, "ok": true, "iter": 1}
+{"config": "pandascript", "task": "login_fx", "peak_pss_mb": 14.919921875, "elapsed_s": 0.028, "cpu_s": 0.029, "ok": true, "iter": 2}
+{"config": "puppeteer-lightpanda", "task": "login_fx", "peak_pss_mb": 102.255859375, "elapsed_s": 0.244, "cpu_s": 0.355, "cpu_engine_s": 0.04, "cpu_driver_s": 0.315, "ok": true, "iter": 2}
+{"config": "puppeteer-chrome", "task": "login_fx", "peak_pss_mb": 480.2470703125, "elapsed_s": 0.471, "cpu_s": 1.89, "cpu_engine_s": 1.29, "cpu_driver_s": 0.6, "ok": true, "iter": 2}
+{"config": "playwright-lightpanda", "task": "login_fx", "peak_pss_mb": 122.75390625, "elapsed_s": 0.252, "cpu_s": 0.563, "cpu_engine_s": 0.08, "cpu_driver_s": 0.483, "ok": true, "iter": 2}
+{"config": "playwright-chrome", "task": "login_fx", "peak_pss_mb": 561.6416015625, "elapsed_s": 0.494, "cpu_s": 2.373, "cpu_engine_s": 1.59, "cpu_driver_s": 0.783, "ok": true, "iter": 2}
+{"config": "browseruse-chrome", "task": "login_fx", "peak_pss_mb": 407.16015625, "elapsed_s": 0.877, "cpu_s": 1.747, "cpu_engine_s": 1.25, "cpu_driver_s": 0.497, "ok": true, "iter": 2}
+{"config": "browseruse-lightpanda", "task": "login_fx", "peak_pss_mb": 96.1650390625, "elapsed_s": 0.741, "cpu_s": 0.413, "cpu_engine_s": 0.03, "cpu_driver_s": 0.383, "ok": true, "iter": 2}
+{"config": "pandascript", "task": "login_fx", "peak_pss_mb": 14.908203125, "elapsed_s": 0.032, "cpu_s": 0.031, "ok": true, "iter": 3}
+{"config": "puppeteer-lightpanda", "task": "login_fx", "peak_pss_mb": 103.0458984375, "elapsed_s": 0.239, "cpu_s": 0.361, "cpu_engine_s": 0.04, "cpu_driver_s": 0.321, "ok": true, "iter": 3}
+{"config": "puppeteer-chrome", "task": "login_fx", "peak_pss_mb": 492.32421875, "elapsed_s": 0.46, "cpu_s": 1.962, "cpu_engine_s": 1.45, "cpu_driver_s": 0.512, "ok": true, "iter": 3}
+{"config": "playwright-lightpanda", "task": "login_fx", "peak_pss_mb": 123.4267578125, "elapsed_s": 0.285, "cpu_s": 0.642, "cpu_engine_s": 0.08, "cpu_driver_s": 0.562, "ok": true, "iter": 3}
+{"config": "playwright-chrome", "task": "login_fx", "peak_pss_mb": 545.8505859375, "elapsed_s": 0.463, "cpu_s": 2.297, "cpu_engine_s": 1.57, "cpu_driver_s": 0.727, "ok": true, "iter": 3}
+{"config": "browseruse-chrome", "task": "login_fx", "peak_pss_mb": 396.623046875, "elapsed_s": 0.558, "cpu_s": 1.591, "cpu_engine_s": 1.1, "cpu_driver_s": 0.491, "ok": true, "iter": 3}
+{"config": "browseruse-lightpanda", "task": "login_fx", "peak_pss_mb": 95.986328125, "elapsed_s": 0.417, "cpu_s": 0.35, "cpu_engine_s": 0.02, "cpu_driver_s": 0.33, "ok": true, "iter": 3}
+{"config": "pandascript", "task": "login_fx", "peak_pss_mb": 14.875, "elapsed_s": 0.033, "cpu_s": 0.033, "ok": true, "iter": 4}
+{"config": "puppeteer-lightpanda", "task": "login_fx", "peak_pss_mb": 102.9072265625, "elapsed_s": 0.24, "cpu_s": 0.366, "cpu_engine_s": 0.04, "cpu_driver_s": 0.326, "ok": true, "iter": 4}
+{"config": "puppeteer-chrome", "task": "login_fx", "peak_pss_mb": 495.08203125, "elapsed_s": 0.453, "cpu_s": 1.882, "cpu_engine_s": 1.41, "cpu_driver_s": 0.472, "ok": true, "iter": 4}
+{"config": "playwright-lightpanda", "task": "login_fx", "peak_pss_mb": 123.150390625, "elapsed_s": 0.284, "cpu_s": 0.632, "cpu_engine_s": 0.08, "cpu_driver_s": 0.552, "ok": true, "iter": 4}
+{"config": "playwright-chrome", "task": "login_fx", "peak_pss_mb": 535.384765625, "elapsed_s": 0.488, "cpu_s": 2.206, "cpu_engine_s": 1.41, "cpu_driver_s": 0.796, "ok": true, "iter": 4}
+{"config": "browseruse-chrome", "task": "login_fx", "peak_pss_mb": 402.3544921875, "elapsed_s": 0.848, "cpu_s": 1.72, "cpu_engine_s": 1.25, "cpu_driver_s": 0.47, "ok": true, "iter": 4}
+{"config": "browseruse-lightpanda", "task": "login_fx", "peak_pss_mb": 96.0068359375, "elapsed_s": 0.72, "cpu_s": 0.36, "cpu_engine_s": 0.03, "cpu_driver_s": 0.33, "ok": true, "iter": 4}

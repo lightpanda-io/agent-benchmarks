@@ -1,0 +1,3 @@
+{"config": "pandascript-paced", "task": "scrape", "peak_pss_mb": 162.720703125, "elapsed_s": 2.708, "cpu_s": 2.282, "parallel": 16, "topology": "process", "n_ok": 16, "ok": true, "iter": 0}
+{"config": "pandascript-paced", "task": "scrape", "peak_pss_mb": 161.994140625, "elapsed_s": 2.624, "cpu_s": 2.12, "parallel": 16, "topology": "process", "n_ok": 16, "ok": true, "iter": 1}
+{"config": "pandascript-paced", "task": "scrape", "peak_pss_mb": 161.873046875, "elapsed_s": 2.812, "cpu_s": 2.118, "parallel": 16, "topology": "process", "n_ok": 16, "ok": true, "iter": 2}
