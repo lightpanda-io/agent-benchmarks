@@ -8,27 +8,29 @@ args = os.environ.get("BENCH_LPD_ARGS", "").split()
 
 with Browser(args=args) as b:
     page = b.new_session()
-    page.goto(url="https://eu.gymshark.com/es-ES/collections/all-products/mens")
+    page.goto(url="https://www.outdoorvoices.com/collections/m-shorts")
 
     products = page.extract(schema={
         "products": [{
-            "selector": "[class*='product-card_card-wrapper']",
+            "selector": "product-card",
             "limit": 3,
             "fields": {
-                "name": {"selector": "[class*='product-card_title'] a"},
-                "url": {"selector": "a[href*='/products/']", "attr": "href"},
+                "name": {"selector": "a.product-card__title"},
+                "url": {"selector": "a.product-card__title", "attr": "href"},
             },
         }],
     })["products"]
 
     for product in products:
+        if product["url"].startswith("/"):
+            product["url"] = "https://www.outdoorvoices.com" + product["url"]
         page.goto(url=product["url"])
-        page.wait_for_selector(selector="fieldset[class*='add-to-cart_sizes']")
+        page.wait_for_selector(selector=".product-form__option-value-name")
         details = page.extract(schema={
-            "price": {"selector": "[class*='product-information_price']"},
-            "sizes": ["fieldset[class*='add-to-cart_sizes'] label[class*='size_size']"],
+            "price": {"selector": "price-snippet.price .price__item"},
+            "sizes": [".product-form__option-value-name"],
         })
-        product["price"] = float(re.search(r"\d+(?:\.\d+)?", details["price"].replace(",", ".")).group())
+        product["price"] = float(re.search(r"\d+(?:\.\d+)?", details["price"]).group())
         product["sizesAvailable"] = details["sizes"]
 
 print(json.dumps(products))

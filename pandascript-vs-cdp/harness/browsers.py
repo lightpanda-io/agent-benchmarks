@@ -49,7 +49,22 @@ def _wait_json_version(port, timeout_s=15.0):
     raise TimeoutError(f"{url} not ready after {timeout_s}s")
 
 
+def _assert_port_free(port):
+    """A browser left behind by an earlier run keeps its port, and the
+    readiness poll below would accept it as the browser we just launched —
+    every later run on that port would then measure a stale, warm browser.
+    Fail loudly instead."""
+    try:
+        with socket.create_connection(("127.0.0.1", port), timeout=0.2):
+            pass
+    except OSError:
+        return
+    raise RuntimeError(f"port {port} already has a listener — stale browser from an earlier run? "
+                       f"(ss -ltnp | grep :{port})")
+
+
 def launch_lightpanda(lpd_path, port, extra_flags=()):
+    _assert_port_free(port)
     t0 = time.perf_counter()
     proc = subprocess.Popen(
         [lpd_path, "serve", "--host", "127.0.0.1", "--port", str(port), *extra_flags],
@@ -73,6 +88,7 @@ CHROME_FLAGS = [
 
 
 def launch_chrome(chrome_path, port, user_data_dir):
+    _assert_port_free(port)
     t0 = time.perf_counter()
     proc = subprocess.Popen(
         [

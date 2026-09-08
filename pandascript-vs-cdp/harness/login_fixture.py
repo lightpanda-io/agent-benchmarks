@@ -102,6 +102,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 9280
+    # Parallel batches (bench.py --parallel) open N connections within the same
+    # few ms; the default backlog of 5 drops SYNs beyond it and the client
+    # retransmits after 1 s, which shows up as a bimodal 1 s stall.
+    http.server.ThreadingHTTPServer.request_queue_size = 256
     server = http.server.ThreadingHTTPServer(("127.0.0.1", port), Handler)
     print(f"login fixture on http://127.0.0.1:{port}", flush=True)
     server.serve_forever()

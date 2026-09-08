@@ -11,23 +11,24 @@ with sync_playwright() as p:
     context = browser.new_context()
     page = context.new_page()
 
-    page.goto("https://eu.gymshark.com/es-ES/collections/all-products/mens")
+    page.goto("https://www.outdoorvoices.com/collections/m-shorts")
 
     products = page.eval_on_selector_all(
-        "[class*='product-card_card-wrapper']",
+        "product-card",
         """(cards) => cards.slice(0, 3).map((card) => ({
-          name: card.querySelector("[class*='product-card_title'] a")?.textContent.trim(),
-          url: card.querySelector("a[href*='/products/']")?.href ?? "",
+          name: card.querySelector("a.product-card__title")?.textContent.trim(),
+          url: card.querySelector("a.product-card__title")?.href ?? "",
         }))""",
     )
 
     for product in products:
         page.goto(product["url"], wait_until="domcontentloaded")
-        page.wait_for_selector("fieldset[class*='add-to-cart_sizes']")
-        price_text = page.text_content("[class*='product-information_price']")
-        product["price"] = float(re.search(r"\d+(?:\.\d+)?", price_text.replace(",", ".")).group())
+        # hidden popup: wait for presence, not visibility
+        page.wait_for_selector(".product-form__option-value-name", state="attached")
+        price_text = page.text_content("price-snippet.price .price__item")
+        product["price"] = float(re.search(r"\d+(?:\.\d+)?", price_text).group())
         product["sizesAvailable"] = page.eval_on_selector_all(
-            "fieldset[class*='add-to-cart_sizes'] label[class*='size_size']",
+            ".product-form__option-value-name",
             "(labels) => labels.map((l) => l.textContent.trim())",
         )
 

@@ -2,9 +2,9 @@
 
 Benchmark: PandaScript replay (`lightpanda agent script.js`) vs the same tasks
 written for Puppeteer and Playwright over CDP, driving `lightpanda serve` and
-headless Chrome. Live-site runs against news.ycombinator.com, gymshark.com
-(allbirds.com in the original dataset — see "Reruns and site blocking"),
-and apnews.com, plus a local login fixture.
+headless Chrome. Live-site runs against news.ycombinator.com,
+outdoorvoices.com (allbirds.com, then eu.gymshark.com, in earlier datasets —
+see "Reruns and site blocking"), and apnews.com, plus a local login fixture.
 
 Contents:
 
@@ -42,7 +42,12 @@ Contents:
   first 3 product cards (name, url) → each product page → price + sizes
   (4 page loads, live site). Originally allbirds.com (datasets in git
   history); ported to eu.gymshark.com after allbirds began blocking
-  lightpanda-fingerprinted traffic from our IP.
+  lightpanda-fingerprinted traffic from our IP; ported again to
+  outdoorvoices.com (v13) because gymshark's listing is an infinite scroll
+  whose sentinel a layout-less browser reports visible on every observe, so
+  lightpanda paginated to page 17 and loaded 4x the products Chrome did —
+  a different task on each engine, not a comparison. Outdoor Voices renders
+  the same 12 cards server-side on both.
 - **news** — media monitoring on apnews.com: section page → first 3 article
   links → each article → headline + first paragraphs (4 page loads, live,
   ad/tag-heavy).
@@ -112,6 +117,57 @@ rotation) so live-site latency drift hits all configs equally. Report medians
 + IQR via `report.py`. Per-run shape validation discards bad runs; any
 "Validation required" (captcha) response aborts a login benchmark outright.
 
+- **parallel** (`--parallel N`, either mode) — every execution runs N flows
+  of the config at once; `ms` is the batch wall clock (first launch to last
+  exit) and the per-flow records sit under `flows`. `--topology process`
+  (default) gives each flow its own engine: N `lightpanda serve` / N Chrome
+  processes, the protocol of the
+  [demo crawler benchmark](https://github.com/lightpanda-io/demo/blob/main/BENCHMARKS.md#crawler-benchmark)
+  behind the README's headline numbers. `--topology shared` connects all N
+  flows to one engine (N tabs in one Chrome; N sessions on one
+  `lightpanda serve`, whose default cap of 16 CDP clients the harness raises
+  when needed). Cold launches the engines inside the timer; warm holds one
+  per flow (or the one shared engine) across the phase. `memprobe.py` takes
+  the same two flags and reports the batch's peak PSS and CPU. The one cell
+  the harness skips is browseruse-chrome under `shared`: the CLI's daemons
+  all drive the default context's first tab, so N of them on one Chrome
+  fight over it (on `lightpanda serve` each CDP connection gets its own
+  page, so that leg runs).
+
+  Live sites under batches, from the `par` campaign (2026-09-05): gymshark
+  throttles at N=4 (zero product cards on every engine), so retail is
+  single-flow only; apnews takes N=4 with every engine 2-3x slower per flow;
+  Hacker News takes N=4 cleanly, and at 8 and 16 its burst limiter rejects
+  some *instant-start* flows (PandaScript, browser-use) with an empty front
+  page and tarpits a few for 5 s, while Puppeteer/Playwright flows are
+  staggered by node startup and mostly pass — the report counts a batch
+  when at least half its flows passed and shows the pass rate. Warm mode
+  holds N browsers per config for every config at once: at N=16 with all
+  seven that is ~100 browsers with live pages and it OOM-killed a 30 GB
+  machine, so warm stops at N=8 on live sites. PandaScript's `goto` rejects
+  at its 10 s default timeout where Puppeteer/Playwright wait 30 s, which
+  matters on apnews under load.
+
+  The burst problem is PandaScript's own speed: sixteen `lightpanda run`
+  processes send their first request within the same millisecond, so a
+  site's limiter sees one burst (HN: 503 for a quarter of them, the rest
+  queued for seconds), while the node/Chrome startup in front of the other
+  drivers staggers their requests for free. The `pandascript-paced` config
+  is the same replay with its processes started 30 ms apart, inside the
+  batch timer, which is what a scraper's pool does: 16/16 clean flows on
+  HN, batch 2.7 s instead of 5.1 s (76% of flows passing). The parallel
+  scrape figure shows the paced run as its PandaScript line and omits the
+  instant-start one. (`--http-nav-delay` does not help
+  here: it spaces navigations *within* one process, and sixteen Pages in
+  one process is 4x slower than sixteen processes anyway.)
+
+  Why it exists: single-flow latency on live sites is network-bound and
+  shows lightpanda at roughly 1.2–1.9× Chrome; the crawler's ~9× is a
+  throughput number at 25-way parallelism on a 4-vCPU box, where Chrome
+  saturates the CPU and lightpanda's ~18× lower CPU per page turns into
+  wall clock. `--parallel` measures that regime here; `memprobe.py`'s
+  `cpu_s` is the per-flow CPU cost that predicts it.
+
 ## Runbook
 
 ```bash
@@ -155,9 +211,34 @@ uv run python harness/memprobe.py --tasks scrape,retail,news,login_fx --iters 5 
 uv run python harness/report.py results/<dir> [results/<dir> ...]
 ```
 
+Both launchers refuse a port that already has a listener: a browser leaked
+by an earlier run keeps its port, and the readiness poll would otherwise
+accept it as the one just launched, so every later run on that port would
+measure a stale, warm browser (`ss -ltnp | grep :92` finds the culprit).
+
 Each results dir gets `raw.jsonl` (one line per execution), `meta.json`
 (versions, kernel, CPU governor), and the report prints median/p25/p75/min/max
 plus median browser launch-to-ready for cold runs.
+
+The puppeteer scripts also print a `BENCH_STEPS` line on stderr with the
+elapsed time of every step (connect, newpage, each goto, each wait, each
+evaluate, close); the harness stores it as `steps` on the run and `report.py`
+prints per-step medians, which splits a flow into driver floor, navigation
+(network + engine) and in-page work. `memprobe.py` records `cpu_s`
+(utime+stime over the whole process tree, sampled) next to `peak_pss_mb`,
+split into `cpu_engine_s` / `cpu_driver_s` for the CDP configs.
+
+```bash
+# throughput regime: 8 concurrent flows per execution, one engine per flow
+uv run python harness/bench.py --task login_fx --mode cold --parallel 8 --runs 10 --warmup 2 --pace 1 \
+    --configs pandascript,puppeteer-lightpanda,puppeteer-chrome
+# same, all flows on one held engine (N tabs / N sessions)
+uv run python harness/bench.py --task login_fx --mode warm --parallel 8 --topology shared --runs 10 --warmup 2 --pace 1 \
+    --configs puppeteer-lightpanda,puppeteer-chrome
+# peak memory and CPU of the whole 8-flow batch
+uv run python harness/memprobe.py --tasks login_fx --parallel 8 --iters 5 --pace 2
+# the full sweep (1/4/8/16, both topologies, memory, then live sites at N=4): run-parallel.sh
+```
 
 ## Reruns and site blocking
 

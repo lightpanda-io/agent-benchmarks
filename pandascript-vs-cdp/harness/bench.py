@@ -10,12 +10,22 @@ each execution times a fresh `node script.js` (which still pays node startup
 and CDP connect - that is what a new task against a browser pool costs).
 PandaScript has no warm/cold split; its warm run is the same full command.
 
+Parallel mode (--parallel N): every rotation runs N flows of the config at
+once and the record's `ms` is the batch wall clock, first launch to last exit
+(per-flow records are kept under `flows`). --topology process gives each flow
+its own engine (N lightpanda serve / N Chrome processes, the demo crawler's
+protocol); --topology shared connects all N flows to one engine (N tabs in one
+Chrome, N sessions on one lightpanda serve). This is the regime where the
+per-page CPU/memory cost turns into throughput, which single-flow latency
+cannot show.
+
 Usage:
   LPD_PATH=/path/to/release/lightpanda uv run python harness/bench.py \
       --task scrape --mode cold --runs 20 --warmup 2 --pace 3
 """
 
 import argparse
+import concurrent.futures
 import datetime
 import json
 import os
@@ -39,6 +49,14 @@ CONFIGS = [
     # Same replay but never persists the cache dir in warm mode — for
     # anchored A/Bs of the warm-cache convention on unstable sites.
     ("pandascript-fresh", "pandascript", "lightpanda", None),
+    # Same replay, but in a parallel batch its processes start STAGGER_S
+    # apart (inside the batch timer) instead of all at once. Sixteen
+    # `lightpanda run` processes send their first request within the same
+    # millisecond, which trips a site's burst limiter (Hacker News: 503 for
+    # a quarter of them, the rest queued for seconds) — the drivers with a
+    # node/Chrome startup in front are staggered for free. This is what a
+    # scraper's pool does; the row shows the cost of doing it.
+    ("pandascript-paced", "pandascript", "lightpanda", None),
     ("puppeteer-lightpanda", "puppeteer", "lightpanda", 9231),
     ("puppeteer-chrome", "puppeteer", "chrome", 9232),
     ("playwright-lightpanda", "playwright", "lightpanda", 9233),
@@ -119,6 +137,13 @@ def lpd_cache_flags(tag, persist=False):
 
 _persisted_cache_dirs = set()
 
+# Start spacing between the flows of a "-paced" config's batch (see CONFIGS).
+STAGGER_S = 0.03
+
+
+def stagger_for(name, slot):
+    return slot * STAGGER_S if name.endswith("-paced") else 0.0
+
 # Per-config consecutive warm-failure count for the browseruse held-browser
 # recycle heuristic in run_once.
 _bu_warm_fails = {}
@@ -129,37 +154,65 @@ _bu_warm_fails = {}
 _lpd_extra = []
 
 
-def launch_browser(engine, port, lpd_path, chrome_path):
+def launch_browser(engine, port, lpd_path, chrome_path, max_conn=None):
     if engine == "chrome":
         return browsers.launch_chrome(chrome_path, port, SCRATCH / f"chrome-profile-{port}")
-    return browsers.launch_lightpanda(lpd_path, port, [*lpd_cache_flags(f"serve-{port}"), *_lpd_extra])
+    # serve accepts 16 concurrent CDP clients by default; a shared-topology
+    # batch larger than that needs the cap raised.
+    cap = ["--cdp-max-connections", str(max_conn)] if max_conn and max_conn > 16 else []
+    return browsers.launch_lightpanda(lpd_path, port, [*lpd_cache_flags(f"serve-{port}"), *_lpd_extra, *cap])
 
 
-def browseruse_dirs(name):
+def slot_port(port, slot):
+    """CDP port for flow `slot` of a parallel batch: 100 apart, so the
+    consecutive base ports in CONFIGS never collide across configs, nor with
+    the fixture (9280) or the profile prewarm (9250)."""
+    return port + 100 * slot
+
+
+def parse_steps(stderr):
+    """Per-step timings the puppeteer scripts print to stderr as a final
+    `BENCH_STEPS [[label, ms], ...]` line (see scripts/puppeteer/*.js)."""
+    for line in reversed((stderr or "").splitlines()):
+        if line.startswith("BENCH_STEPS "):
+            try:
+                return json.loads(line[len("BENCH_STEPS "):])
+            except json.JSONDecodeError:
+                return None
+    return None
+
+
+def bu_tag(name, slot=0):
+    """Key for one flow's browser-use daemon and state dirs: the config name
+    for slot 0 (single-flow runs), name-slot inside a parallel batch."""
+    return name if slot == 0 else f"{name}-{slot}"
+
+
+def browseruse_dirs(tag):
     # BH_RUNTIME_DIR holds the daemon's unix socket; AF_UNIX paths cap at ~107
     # bytes, so BENCH_SCRATCH overrides must stay short.
-    return SCRATCH / f"bh-home-{name}", SCRATCH / f"bh-rt-{name}"
+    return SCRATCH / f"bh-home-{tag}", SCRATCH / f"bh-rt-{tag}"
 
 
-def browseruse_env(name, endpoint):
+def browseruse_env(tag, endpoint):
     """Env for one `browser-use` invocation: state dirs, telemetry off, and the
     engine's CDP endpoint — ws:// is used verbatim via BU_CDP_WS, http://
     resolves through /json/version via BU_CDP_URL."""
-    home, rt = browseruse_dirs(name)
+    home, rt = browseruse_dirs(tag)
     var = "BU_CDP_WS" if endpoint.startswith("ws") else "BU_CDP_URL"
     return {"BH_HOME": str(home), "BH_RUNTIME_DIR": str(rt),
             "ANONYMIZED_TELEMETRY": "false", var: endpoint}
 
 
-def browseruse_wipe(name):
+def browseruse_wipe(tag):
     """Cold isolation: no daemon, no state dirs left from a previous run."""
-    kill_browseruse_daemon(name)
-    for d in browseruse_dirs(name):
+    kill_browseruse_daemon(tag)
+    for d in browseruse_dirs(tag):
         shutil.rmtree(d, ignore_errors=True)
 
 
-def kill_browseruse_daemon(name):
-    _, rt = browseruse_dirs(name)
+def kill_browseruse_daemon(tag):
+    _, rt = browseruse_dirs(tag)
     try:
         pid = int((rt / "bu.pid").read_text())
         os.kill(pid, signal.SIGTERM)
@@ -178,9 +231,17 @@ def kill_browseruse_daemon(name):
         pass
 
 
-def run_once(cfg, task, mode, lpd_path, chrome_path, held_browsers):
+def run_once(cfg, task, mode, lpd_path, chrome_path, held_browsers, slot=0, shared=None):
+    """One flow of `cfg`. `slot` is the flow's index within a parallel batch
+    (own port, own cache tag, own held browser under (name, slot)); `shared`
+    is an already-launched engine every flow of the batch connects to, whose
+    lifetime the caller owns. Single-flow runs are slot 0, no shared."""
     name, driver, engine, port = cfg
+    if port is not None:
+        port = slot_port(port, slot)
     timeout = TASK_TIMEOUT_S[task]
+    if stagger_for(name, slot):
+        time.sleep(stagger_for(name, slot))  # inside the caller's batch timer
     env = {**os.environ, "LIGHTPANDA_DISABLE_TELEMETRY": "true"}
     if task == "login_fx":
         base = f"http://127.0.0.1:{FIXTURE_PORT}"
@@ -190,7 +251,7 @@ def run_once(cfg, task, mode, lpd_path, chrome_path, held_browsers):
 
     if driver in ("pandascript", "lightpanda-py"):
         persist = mode == "warm" and name != "pandascript-fresh"
-        cache = lpd_cache_flags(name, persist=persist)
+        cache = lpd_cache_flags(name if slot == 0 else f"{name}-{slot}", persist=persist)
         if driver == "pandascript":
             cmd = [lpd_path, "agent", *cache, *_lpd_extra, str(script_path(driver, task))]
         else:
@@ -211,28 +272,33 @@ def run_once(cfg, task, mode, lpd_path, chrome_path, held_browsers):
             cmd = [runner, str(script_path(driver, task))]
             run_kwargs = {}
         browser = None
+        tag = bu_tag(name, slot)
         try:
-            if mode == "cold":
-                if driver == "browseruse":
-                    browseruse_wipe(name)
-                    # The CLI drives the default browser context, which sees
-                    # the profile's disk cache and cookies — persisting the
-                    # profile would make these cold runs warm-cache. (The
-                    # puppeteer/playwright legs are immune: their incognito
-                    # context's cache dies with the context every run.)
-                    if engine == "chrome":
-                        shutil.rmtree(SCRATCH / f"chrome-profile-{port}", ignore_errors=True)
+            if driver == "browseruse" and mode == "cold":
+                browseruse_wipe(tag)
+                # The CLI drives the default browser context, which sees the
+                # profile's disk cache and cookies — persisting the profile
+                # would make these cold runs warm-cache. (The puppeteer/
+                # playwright legs are immune: their incognito context's cache
+                # dies with the context every run.) A shared engine's profile
+                # is wiped by run_parallel before the launch.
+                if engine == "chrome" and shared is None:
+                    shutil.rmtree(SCRATCH / f"chrome-profile-{port}", ignore_errors=True)
+            if shared is not None:
+                browser = shared
+                t0 = time.perf_counter()
+            elif mode == "cold":
                 t0 = time.perf_counter()
                 browser = launch_browser(engine, port, lpd_path, chrome_path)
                 rec["launch_ms"] = browser.ready_ms
             else:
-                browser = held_browsers[name]
+                browser = held_browsers[(name, slot)]
                 t0 = time.perf_counter()
             if driver == "browseruse":
                 # Cold pays the daemon spawn inside the timer (it is part of
                 # the stack's cold cost); warm reuses the held daemon via the
                 # persistent state dirs.
-                env.update(browseruse_env(name, browser.endpoint))
+                env.update(browseruse_env(tag, browser.endpoint))
             else:
                 env["BROWSER_WS"] = browser.endpoint
             proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env, **run_kwargs)
@@ -245,21 +311,22 @@ def run_once(cfg, task, mode, lpd_path, chrome_path, held_browsers):
             # Page.navigate never commits) — after 2 consecutive failures,
             # recycle the held browser like a pool health check would, and
             # flag the run so the semi-cold successor rows are attributable.
+            # (A shared engine is never recycled from inside one flow.)
             if driver == "browseruse" and mode == "warm":
                 if proc.returncode != 0:
-                    kill_browseruse_daemon(name)
-                    _bu_warm_fails[name] = _bu_warm_fails.get(name, 0) + 1
-                    if _bu_warm_fails[name] >= 2:
-                        held_browsers[name].kill()
-                        held_browsers[name] = launch_browser(engine, port, lpd_path, chrome_path)
+                    kill_browseruse_daemon(tag)
+                    _bu_warm_fails[tag] = _bu_warm_fails.get(tag, 0) + 1
+                    if _bu_warm_fails[tag] >= 2 and shared is None:
+                        held_browsers[(name, slot)].kill()
+                        held_browsers[(name, slot)] = launch_browser(engine, port, lpd_path, chrome_path)
                         rec["browser_recycled"] = True
-                        _bu_warm_fails[name] = 0
+                        _bu_warm_fails[tag] = 0
                 else:
-                    _bu_warm_fails[name] = 0
+                    _bu_warm_fails[tag] = 0
         finally:
-            if mode == "cold" and browser is not None:
+            if mode == "cold" and browser is not None and shared is None:
                 if driver == "browseruse":
-                    kill_browseruse_daemon(name)
+                    kill_browseruse_daemon(tag)
                 browser.kill()
 
     rec["exit"] = proc.returncode
@@ -273,6 +340,68 @@ def run_once(cfg, task, mode, lpd_path, chrome_path, held_browsers):
     if err:
         rec["error"] = err
     if "captcha" in (proc.stderr or "") or "Validation required" in (proc.stdout or ""):
+        rec["captcha"] = True
+    steps = parse_steps(proc.stderr)
+    if steps:
+        rec["steps"] = steps
+    return rec
+
+
+def drop_unsupported_shared(configs, n, topology):
+    """browser-use's daemons all drive the default context's first tab, so N
+    of them on one Chrome fight over that tab (lightpanda serve gives each
+    CDP connection its own page, so its leg is fine). Skip the cell with a
+    note rather than record N flows of nonsense."""
+    if n > 1 and topology == "shared":
+        for c in configs:
+            if c[1] == "browseruse" and c[2] == "chrome":
+                print(f"note: skipping {c[0]} under --topology shared (one tab per Chrome for its daemons)")
+        configs = [c for c in configs if not (c[1] == "browseruse" and c[2] == "chrome")]
+    return configs
+
+
+def run_parallel(cfg, task, mode, n, topology, lpd_path, chrome_path, held_browsers):
+    """n concurrent flows of `cfg`. `ms` is the batch wall clock from the first
+    launch to the last exit; `flows` keeps the per-flow records. In cold mode
+    the engines are launched inside the timer (process topology: one per
+    flow, in its own thread; shared: one, then the flows); in warm mode they
+    are held under (name, slot) or (name, "shared")."""
+    name, driver, engine, port = cfg
+    rec = {"config": name, "task": task, "mode": mode, "parallel": n, "topology": topology}
+    owns_engine = driver not in ("pandascript", "lightpanda-py")
+    shared = None
+    t0 = time.perf_counter()
+    try:
+        if topology == "shared" and owns_engine:
+            if mode == "cold":
+                if driver == "browseruse" and engine == "chrome":
+                    shutil.rmtree(SCRATCH / f"chrome-profile-{port}", ignore_errors=True)
+                shared = launch_browser(engine, port, lpd_path, chrome_path, max_conn=n)
+                rec["launch_ms"] = shared.ready_ms
+            else:
+                shared = held_browsers[(name, "shared")]
+        with concurrent.futures.ThreadPoolExecutor(max_workers=n) as pool:
+            futures = [pool.submit(run_once, cfg, task, mode, lpd_path, chrome_path, held_browsers, i, shared)
+                       for i in range(n)]
+            flows = []
+            for f in futures:
+                try:
+                    flows.append(f.result())
+                except subprocess.TimeoutExpired:
+                    flows.append({"ok": False, "error": "timeout"})
+        rec["ms"] = (time.perf_counter() - t0) * 1000
+    finally:
+        if shared is not None and mode == "cold":
+            if driver == "browseruse":
+                for i in range(n):
+                    kill_browseruse_daemon(bu_tag(name, i))
+            shared.kill()
+    rec["flows"] = flows
+    rec["n_ok"] = sum(1 for f in flows if f.get("ok"))
+    rec["ok"] = rec["n_ok"] == n
+    if not rec["ok"]:
+        rec["error"] = next(f.get("error", "?") for f in flows if not f.get("ok"))
+    if any(f.get("captcha") for f in flows):
         rec["captcha"] = True
     return rec
 
@@ -349,7 +478,12 @@ def main():
     ap.add_argument("--configs", default=None, help="comma-separated subset of config names")
     ap.add_argument("--out", default=None, help="results dir (default: results/<UTC ts>)")
     ap.add_argument("--lpd-flags", default="", help="comma-separated extra flags for every lightpanda invocation (recorded in meta.json)")
+    ap.add_argument("--parallel", type=int, default=1, help="flows per execution, run concurrently (batch wall clock is the metric)")
+    ap.add_argument("--topology", choices=["process", "shared"], default="process",
+                    help="parallel only: one engine per flow, or all flows on one engine")
     args = ap.parse_args()
+    if args.parallel < 1:
+        sys.exit("--parallel must be >= 1")
     _lpd_extra.extend(f for f in args.lpd_flags.split(",") if f)
 
     lpd_path = os.environ.get("LPD_PATH")
@@ -372,6 +506,7 @@ def main():
                  "(e.g. ~/.local/bin/browser-use from `uv tool install browser-use`)")
     if args.task == "scrape_par":
         configs = [c for c in configs if c[0] == "pandascript"]
+    configs = drop_unsupported_shared(configs, args.parallel, args.topology)
 
     out_dir = pathlib.Path(args.out) if args.out else ROOT / "results" / (
         datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ") + f"-{args.task}-{args.mode}"
@@ -395,10 +530,16 @@ def main():
     if args.mode == "warm":
         for name, driver, engine, port in configs:
             # pandascript and lightpanda-py own their browser process per run.
-            if driver not in ("pandascript", "lightpanda-py"):
-                if driver == "browseruse":
-                    browseruse_wipe(name)
-                held[name] = launch_browser(engine, port, lpd_path, chrome_path)
+            if driver in ("pandascript", "lightpanda-py"):
+                continue
+            if driver == "browseruse":
+                for slot in range(args.parallel):
+                    browseruse_wipe(bu_tag(name, slot))
+            if args.parallel > 1 and args.topology == "shared":
+                held[(name, "shared")] = launch_browser(engine, port, lpd_path, chrome_path, max_conn=args.parallel)
+            else:
+                for slot in range(args.parallel):
+                    held[(name, slot)] = launch_browser(engine, slot_port(port, slot), lpd_path, chrome_path)
 
     raw = open(out_dir / "raw.jsonl", "a")
     consecutive_fails = {}
@@ -408,7 +549,11 @@ def main():
             is_warmup = rotation < args.warmup
             for cfg in configs:
                 try:
-                    rec = run_once(cfg, args.task, args.mode, lpd_path, chrome_path, held)
+                    if args.parallel > 1:
+                        rec = run_parallel(cfg, args.task, args.mode, args.parallel, args.topology,
+                                           lpd_path, chrome_path, held)
+                    else:
+                        rec = run_once(cfg, args.task, args.mode, lpd_path, chrome_path, held)
                 except subprocess.TimeoutExpired:
                     rec = {"config": cfg[0], "task": args.task, "mode": args.mode,
                            "ok": False, "error": "timeout"}
@@ -418,6 +563,9 @@ def main():
                 raw.write(json.dumps(rec) + "\n")
                 raw.flush()
                 status = "ok" if rec["ok"] else f"FAIL ({rec.get('error', '?')[:80]})"
+                if args.parallel > 1:
+                    status = f"{rec.get('n_ok', 0)}/{args.parallel} ok" if rec["ok"] else \
+                        f"{rec.get('n_ok', 0)}/{args.parallel} ok ({rec.get('error', '?')[:80]})"
                 label = "warmup" if is_warmup else f"run {rotation - args.warmup + 1}/{args.runs}"
                 print(f"[{label}] {cfg[0]}: {rec.get('ms', 0):.0f} ms {status}", flush=True)
                 if rec.get("captcha"):
@@ -426,7 +574,10 @@ def main():
                 # config failing repeatedly in a row means the site is refusing
                 # us — stop rather than hammer through (see README).
                 name = cfg[0]
-                if rec["ok"]:
+                # In a parallel batch only a total loss counts: one wedged
+                # flow out of N is load, not a block, and aborting the phase
+                # on it would cost every other config its remaining runs.
+                if rec["ok"] or (args.parallel > 1 and rec.get("n_ok", 0) > 0):
                     consecutive_fails[name] = 0
                 else:
                     # A site block manifests as clean-exit runs failing the
@@ -442,7 +593,8 @@ def main():
         raw.close()
         for name, driver, engine, port in configs:
             if driver == "browseruse":
-                kill_browseruse_daemon(name)
+                for slot in range(args.parallel):
+                    kill_browseruse_daemon(bu_tag(name, slot))
         for b in held.values():
             b.kill()
         if fixture is not None:

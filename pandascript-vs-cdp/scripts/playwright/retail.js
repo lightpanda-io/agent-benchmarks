@@ -5,24 +5,26 @@ const browser = await chromium.connectOverCDP(endpoint);
 const context = await browser.newContext();
 const page = await context.newPage();
 
-await page.goto("https://eu.gymshark.com/es-ES/collections/all-products/mens");
+await page.goto("https://www.outdoorvoices.com/collections/m-shorts");
 
-const products = await page.$$eval("[class*='product-card_card-wrapper']", (cards) =>
+const products = await page.$$eval("product-card", (cards) =>
   cards.slice(0, 3).map((card) => ({
-    name: card.querySelector("[class*='product-card_title'] a")?.textContent.trim(),
-    url: card.querySelector("a[href*='/products/']")?.href ?? "",
+    name: card.querySelector("a.product-card__title")?.textContent.trim(),
+    url: card.querySelector("a.product-card__title")?.href ?? "",
   })),
 );
 
 for (const product of products) {
   await page.goto(product.url, { waitUntil: "domcontentloaded" });
-  await page.waitForSelector("fieldset[class*='add-to-cart_sizes']");
+  // The size names sit in a popup that stays hidden until clicked: wait for
+  // presence, not visibility (puppeteer's waitForSelector default).
+  await page.waitForSelector(".product-form__option-value-name", { state: "attached" });
   product.price = parseFloat((await page.$eval(
-    "[class*='product-information_price']",
+    "price-snippet.price .price__item",
     (el) => el.textContent,
-  )).replace(",", "."));
+  )).replace(/[^0-9.]/g, ""));
   product.sizesAvailable = await page.$$eval(
-    "fieldset[class*='add-to-cart_sizes'] label[class*='size_size']",
+    ".product-form__option-value-name",
     (labels) => labels.map((l) => l.textContent.trim()),
   );
 }

@@ -38,12 +38,12 @@ def goto(url, timeout=30.0):
         time.sleep(0.05)
     raise RuntimeError(f"navigation to {url} did not commit (tab stuck on {prev})")
 
-goto("https://eu.gymshark.com/es-ES/collections/all-products/mens")
+goto("https://www.outdoorvoices.com/collections/m-shorts")
 wait_for_load()
 
-products = json.loads(js("""JSON.stringify(Array.from(document.querySelectorAll("[class*='product-card_card-wrapper']")).slice(0, 3).map((card) => ({
-  name: card.querySelector("[class*='product-card_title'] a")?.textContent.trim(),
-  url: card.querySelector("a[href*='/products/']")?.href ?? "",
+products = json.loads(js("""JSON.stringify(Array.from(document.querySelectorAll("product-card")).slice(0, 3).map((card) => ({
+  name: card.querySelector("a.product-card__title")?.textContent.trim(),
+  url: card.querySelector("a.product-card__title")?.href ?? "",
 })))"""))
 
 # No waitUntil here: after the commit fence, the selector wait is the
@@ -51,9 +51,9 @@ products = json.loads(js("""JSON.stringify(Array.from(document.querySelectorAll(
 # pattern the other legs use.
 for product in products:
     goto(product["url"])
-    wait_for_element("fieldset[class*='add-to-cart_sizes']")
-    price_text = js("""document.querySelector("[class*='product-information_price']").textContent""")
-    product["price"] = float(re.search(r"\d+(?:\.\d+)?", price_text.replace(",", ".")).group())
-    product["sizesAvailable"] = json.loads(js("""JSON.stringify(Array.from(document.querySelectorAll("fieldset[class*='add-to-cart_sizes'] label[class*='size_size']")).map((l) => l.textContent.trim()))"""))
+    wait_for_element(".product-form__option-value-name")
+    price_text = js("""document.querySelector("price-snippet.price .price__item").textContent""")
+    product["price"] = float(re.search(r"\d+(?:\.\d+)?", price_text).group())
+    product["sizesAvailable"] = json.loads(js("""JSON.stringify(Array.from(document.querySelectorAll(".product-form__option-value-name")).map((l) => l.textContent.trim()))"""))
 
 print(json.dumps(products))
