@@ -76,6 +76,11 @@ ultrafast = [
     "psutil>=6",
     "lightpanda",
 ]
+# pageclass/ — the page-class triage corpus. Stdlib only apart from the browser
+# client, which drives the MCP server and resolves the binary.
+pageclass = [
+    "lightpanda",
+]
 
 [tool.uv.sources]
 lightpanda = { path = "../lightpanda-python", editable = true }

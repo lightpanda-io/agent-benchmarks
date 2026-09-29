@@ -8,31 +8,36 @@ on pages the HTTP status did not settle.** That subset is the only ground a rule
 cannot reach, and it is the only place the comparison means anything. Everything
 here exists to produce that one number honestly.
 
-Needs a `lightpanda` built from a branch carrying the `pageClass` tool, and
-nothing from PyPI — the scripts are stdlib only.
+Needs a `lightpanda` built from a branch carrying the `pageClass` tool. The only
+dependency is the `lightpanda` client itself, which drives the MCP server and
+resolves the binary — `uv sync --group pageclass` once.
 
 ```bash
 export LIGHTPANDA_BIN=/path/to/an/immutable/copy/of/lightpanda
 
 # 1. harvest. No tokens: --judge is off, so this records only what the rules said.
-uv run --no-project python pageclass/harvest.py --out pageclass/corpus/v1.jsonl
+uv run --group pageclass python pageclass/harvest.py --out pageclass/corpus/v1.jsonl
 
 # 2. label what the harvest could not settle.
-uv run --no-project python pageclass/review.py pageclass/corpus/v1.jsonl
+uv run --group pageclass python pageclass/review.py pageclass/corpus/v1.jsonl
 
 # 3. the rules alone.
-uv run --no-project python pageclass/score.py pageclass/corpus/v1.jsonl
+uv run --group pageclass python pageclass/score.py pageclass/corpus/v1.jsonl
 
 # 4. the same urls again, with the model. This one costs tokens.
-uv run --no-project python pageclass/harvest.py --judge \
+uv run --group pageclass python pageclass/harvest.py --judge \
     --out pageclass/corpus/v1-judged.jsonl
-uv run --no-project python pageclass/score.py \
+uv run --group pageclass python pageclass/score.py \
     pageclass/corpus/v1.jsonl pageclass/corpus/v1-judged.jsonl
 ```
 
 `harvest.py` appends and resumes, so an interrupted run keeps what it got and a
 re-run only fetches what is missing. `review.py` writes a separate
 `.labels.jsonl` and never rewrites the corpus, for the same reason.
+
+`--binary` overrides the client's usual resolution order (explicit path, then
+`LIGHTPANDA_BIN`, then the bundled copy, then `PATH`, skipping the package's own
+console script).
 
 Copy the binary somewhere immutable before a campaign: an editor build will swap
 `zig-out/bin/lightpanda` underneath a running harvest, and a debug build skews
