@@ -67,6 +67,15 @@ psbench = [
     "playwright>=1.57,<1.58",
     "lightpanda",
 ]
+# ultrafast/ — the choice-policy demo. httpx[http2] and websockets are the two
+# transports (TypeSafe/chat over HTTP, Chrome over a raw CDP socket); psutil is
+# the peak-RSS probe.
+ultrafast = [
+    "httpx[http2]>=0.28,<1",
+    "websockets>=13",
+    "psutil>=6",
+    "lightpanda",
+]
 
 [tool.uv.sources]
 lightpanda = { path = "../lightpanda-python", editable = true }
@@ -89,3 +98,6 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 "src/agent_benchmarks/webbench/run.py" = ["E501"]
 "src/agent_benchmarks/llm_judge.py" = ["E501"]
 "competitors/agent-browser-mcp/server.py" = ["E501"]
+# Upstream prompt text is vendored verbatim; chrome.py embeds upstream JS.
+"ultrafast/ultrafast/prompts.py" = ["E501"]
+"ultrafast/ultrafast/chrome.py" = ["E501"]
