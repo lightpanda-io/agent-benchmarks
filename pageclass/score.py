@@ -9,20 +9,24 @@ the rows where the status did NOT settle the page, which is the only ground a
 rule cannot reach.
 """
 
+import argparse
 import collections
 import json
 import pathlib
-import sys
+
+#: Jev 1.x input tokens, list price. Output is free. Stale the moment the model
+#: changes, so it is named rather than inlined into an output line.
+PRICE_PER_MTOK_USD = 0.042
 
 
 def load(path: pathlib.Path) -> list[dict]:
     return [json.loads(line) for line in path.open() if line.strip()]
 
 
-def labels_for(corpus: pathlib.Path) -> dict[str, str]:
+def labels_for(rows: list[dict], corpus: pathlib.Path) -> dict[str, str]:
     """Auto-accepted labels from the corpus, plus anything review.py confirmed."""
     out = {}
-    for row in load(corpus):
+    for row in rows:
         if row.get("label"):
             out[row["url"]] = row["label"]
     side = corpus.with_suffix(".labels.jsonl")
@@ -30,6 +34,20 @@ def labels_for(corpus: pathlib.Path) -> dict[str, str]:
         for row in load(side):
             out[row["url"]] = row["label"]
     return out
+
+
+def provenance(row: dict, corpus: pathlib.Path) -> str:
+    """Who produced this row's label. A corpus labelled by the same assistant
+    that wrote the rules is marking its own homework, so no figure should be
+    quotable without it."""
+    if row.get("confirmed") == "auto":
+        return "auto"
+    side = corpus.with_suffix(".labels.jsonl")
+    if side.exists():
+        for label_row in load(side):
+            if label_row["url"] == row["url"]:
+                return f"by={label_row.get('by', '?')}"
+    return "unlabelled"
 
 
 def report(name: str, pairs: list[tuple[str, str]]) -> None:
@@ -71,15 +89,18 @@ def settled_by_status(row: dict) -> bool:
 
 
 def main() -> int:
-    if len(sys.argv) < 2:
-        print(__doc__)
-        return 2
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("corpus")
+    parser.add_argument("judged", nargs="?",
+                        help="the same urls harvested with --judge")
+    args = parser.parse_args()
 
-    rules_path = pathlib.Path(sys.argv[1])
-    truth = labels_for(rules_path)
-    rules_rows = [r for r in load(rules_path) if not r.get("error")]
+    rules_path = pathlib.Path(args.corpus)
+    all_rows = load(rules_path)
+    truth = labels_for(all_rows, rules_path)
+    rules_rows = [r for r in all_rows if not r.get("error")]
 
-    errors = sum(1 for r in load(rules_path) if r.get("error"))
+    errors = len(all_rows) - len(rules_rows)
     unlabelled = [r for r in rules_rows if r["url"] not in truth]
     print(f"{len(rules_rows)} usable row(s), {errors} error(s), "
           f"{len(truth)} labelled, {len(unlabelled)} unlabelled")
@@ -87,17 +108,20 @@ def main() -> int:
         print("  run review.py — unlabelled rows are excluded from every figure below")
 
     scored = [r for r in rules_rows if r["url"] in truth]
+    by = collections.Counter(provenance(r, rules_path) for r in scored)
+    print("  label provenance: " + ", ".join(f"{n} {k}" for k, n in sorted(by.items())))
     report("arm D, every labelled row", [(truth[r["url"]], r["klass"]) for r in scored])
 
     open_rows = [r for r in scored if not settled_by_status(r)]
     report("arm D, rows the status did not settle",
            [(truth[r["url"]], r["klass"]) for r in open_rows])
 
-    if len(sys.argv) < 3:
+    if not args.judged:
         print("\nno judged corpus given; pass one to compare the arms")
         return 0
 
-    judged = {r["url"]: r for r in load(pathlib.Path(sys.argv[2])) if not r.get("error")}
+    judged_rows = load(pathlib.Path(args.judged))
+    judged = {r["url"]: r for r in judged_rows if not r.get("error")}
     both = [r for r in open_rows if r["url"] in judged]
     if not both:
         print("\nthe judged corpus shares no unsettled urls with this one")
@@ -114,8 +138,8 @@ def main() -> int:
         print(f"\nmodel arm: {len(asked)} call(s), "
               f"median {latency[len(latency) // 2]}ms, "
               f"{sum(tokens) / len(tokens):.0f} input tokens mean, "
-              f"${sum(tokens) / 1e6 * 0.042:.5f} total at list price")
-        share = len(asked) / len(load(pathlib.Path(sys.argv[2])))
+              f"${sum(tokens) / 1e6 * PRICE_PER_MTOK_USD:.5f} total at list price")
+        share = len(asked) / len(judged_rows)
         print(f"reached the model arm: {share:.0%} of harvested rows")
 
         low = [j for j in asked if j["judgment"]["confidence"] < 0.7]

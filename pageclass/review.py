@@ -24,6 +24,17 @@ CLASSES = [
 DIM, RESET, BOLD = "\033[2m", "\033[0m", "\033[1m"
 
 
+def as_label(answer: str, proposed: str | None) -> str | None:
+    """The class this answer names, or None if it names none. Kept separate from
+    the prompt loop so the grammar can be read against the printed menu."""
+    if answer == "" and proposed:
+        return proposed
+    if answer.isdigit() and 1 <= int(answer) <= len(CLASSES):
+        return CLASSES[int(answer) - 1]
+    matches = [c for c in CLASSES if c.startswith(answer)] if answer else []
+    return matches[0] if len(matches) == 1 else None
+
+
 def load(path: pathlib.Path) -> list[dict]:
     rows = []
     for line in path.open():
@@ -79,23 +90,14 @@ def main() -> int:
                 try:
                     answer = input("  label> ").strip().lower()
                 except EOFError:
-                    print("\nstopping")
-                    return 0
+                    answer = "q"
                 if answer in ("q", "quit"):
-                    print("stopping")
+                    print("\nstopping")
                     return 0
                 if answer in ("s", "skip"):
                     label = None
                     break
-                if answer == "" and row.get("proposed"):
-                    label = row["proposed"]
-                    break
-                if answer.isdigit() and 1 <= int(answer) <= len(CLASSES):
-                    label = CLASSES[int(answer) - 1]
-                    break
-                matches = [c for c in CLASSES if c.startswith(answer)] if answer else []
-                if len(matches) == 1:
-                    label = matches[0]
+                if label := as_label(answer, row.get("proposed")):
                     break
                 print(f"  {DIM}pick a number, an unambiguous prefix, s to skip, "
                       f"q to stop{RESET}")

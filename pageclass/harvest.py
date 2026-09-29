@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Harvest pageClass reports into a corpus, one JSONL row per probe.
 
-    uv run --group pageclass python pageclass/harvest.py --out corpus/v1.jsonl
+    uv run --no-project python pageclass/harvest.py --out corpus/v1.jsonl
 
 Runs with `judge: false` by default, so a harvest costs no tokens and records
 only what the rules concluded. `--judge` adds the model's answer to each row.
@@ -34,12 +34,10 @@ def absent_path(host: str) -> str:
 
 def probes(site: dict) -> list[dict]:
     host = site["host"]
-    out = [{"probe": "home", "url": f"https://{host}/", "proposed": None}]
-    out.append({
-        "probe": "uuid",
-        "url": f"https://{host}/{absent_path(host)}",
-        "proposed": "not_found",
-    })
+    out = [
+        {"probe": "home", "url": f"https://{host}/", "proposed": None},
+        {"probe": "uuid", "url": f"https://{host}/{absent_path(host)}", "proposed": "not_found"},
+    ]
     if template := site.get("search"):
         out.append({
             "probe": "search",
@@ -67,7 +65,7 @@ def main() -> int:
     parser.add_argument("--judge", action="store_true",
                         help="also ask the decision model (costs tokens)")
     parser.add_argument("--pace", type=float, default=1.5,
-                        help="seconds between requests to one host")
+                        help="seconds between requests to the same host")
     parser.add_argument("--only", help="substring filter over hosts")
     args = parser.parse_args()
 
@@ -88,19 +86,26 @@ def main() -> int:
         print(f"resuming: {len(seen)} row(s) already in {out_path}")
 
     written = 0
+    last_host = None
     with out_path.open("a") as sink, Mcp(args.binary) as lp:
         for site in sites:
             for probe in probes(site):
                 if probe["url"] in seen:
                     continue
+                # Only the same host needs pacing, and only between requests:
+                # sleeping on a host change, or after the last probe, is dead
+                # wall clock. On the current list that was 32 of 72 sleeps.
+                if last_host == site["host"]:
+                    time.sleep(args.pace)
+                last_host = site["host"]
                 report = lp.page_class(probe["url"], judge=args.judge)
-                row = {**probe, "host": site["host"]}
+                row = {**probe, "host": site["host"], "error": None,
+                       "label": None, "confirmed": None}
                 if isinstance(report, str):
-                    row.update(error=report, label=None, confirmed=None)
+                    row["error"] = report
                 else:
                     label, by = confirm(probe["proposed"], report)
                     row.update(
-                        error=None,
                         label=label,
                         confirmed=by,
                         klass=report.get("class"),
@@ -115,7 +120,6 @@ def main() -> int:
                 written += 1
                 mark = row.get("confirmed") or "-"
                 print(f"{mark:4s} {row.get('klass') or 'ERR':15s} {probe['url'][:78]}")
-                time.sleep(args.pace)
 
     print(f"\n{written} row(s) written to {out_path}")
     return 0
