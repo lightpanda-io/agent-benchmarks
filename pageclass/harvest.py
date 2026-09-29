@@ -24,12 +24,20 @@ from sites import NONSENSE_QUERY, SITES
 HARD_NOT_FOUND = {404, 410}
 
 
+def absent_path(host: str) -> str:
+    """A path that cannot exist, derived from the host so it is the same on every
+    run. A fresh uuid4 per run would make two harvests unjoinable and would
+    strand the labels of the first, which is not a theoretical problem: it is how
+    the first campaign's judged pass was wasted."""
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, f"pageclass/{host}"))
+
+
 def probes(site: dict) -> list[dict]:
     host = site["host"]
     out = [{"probe": "home", "url": f"https://{host}/", "proposed": None}]
     out.append({
         "probe": "uuid",
-        "url": f"https://{host}/{uuid.uuid4()}",
+        "url": f"https://{host}/{absent_path(host)}",
         "proposed": "not_found",
     })
     if template := site.get("search"):

@@ -11,9 +11,9 @@ The rule's own verdict is shown last and dimmed, deliberately: reading it first
 is how a reviewer talks themselves into agreeing with the thing being measured.
 """
 
+import argparse
 import json
 import pathlib
-import sys
 
 CLASSES = [
     "content", "not_found", "empty", "login_required", "captcha",
@@ -34,10 +34,16 @@ def load(path: pathlib.Path) -> list[dict]:
 
 
 def main() -> int:
-    if len(sys.argv) < 2:
-        print(__doc__)
-        return 2
-    corpus = pathlib.Path(sys.argv[1])
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("corpus")
+    parser.add_argument("--by", default="human",
+                        help="provenance recorded on each label. Use something "
+                             "other than `human` when the labeller is not one: a "
+                             "corpus scored against labels the model under test "
+                             "produced is marking its own homework, and the "
+                             "provenance is what lets a spot-check find those rows.")
+    args = parser.parse_args()
+    corpus = pathlib.Path(args.corpus)
     labels_path = corpus.with_suffix(".labels.jsonl")
 
     done = {}
@@ -96,7 +102,9 @@ def main() -> int:
 
             if label is not None:
                 sink.write(json.dumps({"url": row["url"], "label": label,
-                                       "by": "human"}) + "\n")
+                                       "by": args.by,
+                                       "agrees_with_rules":
+                                           label == (row.get("rule") or {}).get("class")}) + "\n")
                 sink.flush()
                 print(f"  -> {label}\n")
             else:

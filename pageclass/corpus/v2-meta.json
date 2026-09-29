@@ -1,0 +1,23 @@
+{
+  "campaign": "v2",
+  "date": "2026-09-29",
+  "binary_sha256": "df691992d407d4f799b44b78d86f5cc2ded9eb25269fc691a1b7c13f113c8686",
+  "binary_version": "1.0.0-dev.9919+15e811c25",
+  "branch": "pageclass-triage",
+  "decider_model_reported": "jev-1.13.0",
+  "endpoint": "https://api.typesafe.ai",
+  "vantage": "Spain (consent walls over-represented, geo_blocked absent)",
+  "labels_by": "assistant",
+  "labels_caveat": "Labelled by the same assistant that wrote the rules, the class vocabulary and the labelling guide. 17 of 44 labels disagree with arm D and those decide the result; they are the spot-check set. Provenance is recorded per label in v2.labels.jsonl.",
+  "skipped": "4 rows whose ground truth is ambiguous because the site renders results client-side (MDN, GitHub and DuckDuckGo search) are unlabelled and excluded from every figure.",
+  "headline": {
+    "unsettled_rows": 39,
+    "arm_D": "25/39 = 64.1%",
+    "arm_D_plus_J": "29/39 = 74.4%",
+    "model_calls": 39,
+    "median_latency_ms": 550,
+    "mean_input_tokens": 1211,
+    "cost_usd_list": 0.00198,
+    "share_reaching_model": 0.55
+  }
+}
