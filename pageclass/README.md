@@ -117,6 +117,60 @@ testing rather than repeating.
 Rows that are unlabelled, or that errored, are excluded from every figure and
 counted separately. A run that says "N unlabelled" has not been scored yet.
 
+## Probing the request shape
+
+`judgePage` sends one page per request. Judging a corpus that way is one round
+trip per row, so the question is whether many pages belong in one request —
+System One ingests the state once and answers every question against it, and the
+ids are the caller's, so `class:p7` and a state of 25 pages is a legal request
+today with no client change.
+
+Two probes, stdlib only, no browser, no project environment:
+
+```bash
+export TYPESAFE_API_KEY=...   # not the gateway: it 503s on bodies this size
+
+uv run --no-project python pageclass/probe_pages.py --dry-run
+uv run --no-project python pageclass/probe_pages.py \
+    --sizes 1,5,10,25 --out pageclass/corpus/probe-pages.jsonl
+uv run --no-project python pageclass/probe_questions.py \
+    --pages 25 --asked 1,5,10,25 --out pageclass/corpus/probe-questions.jsonl
+```
+
+`probe_pages.py` grows the state and holds the questions at four, isolating
+ingest. `probe_questions.py` holds the state and grows the questions, which is
+TypeSafe's "adding questions barely changes the response time" at the scale this
+would need. `--dry-run` prints the configurations and their sizes without
+sending anything.
+
+**What the numbers mean.** Fit `latency = A + B * tokens`. Sequential over N
+pages costs `N * (A + B * t)`; one batched request costs `A + B * (N * t)`. The
+token term is identical, so **batching saves exactly `(N-1) * A` and nothing
+else** — and N concurrent requests beat both, finishing in about one request's
+latency. So the whole case rests on the size of `A`, which only `probe_pages.py`
+can measure: `probe_questions.py` never shrinks the state, so its intercept is
+extrapolation and it says so rather than quoting a saving.
+
+Read the `fit d%` column, not a cost per token: with a fixed per-request cost,
+ms-per-token falls as the request grows even when the cost is perfectly linear,
+so that ratio cannot tell linear from superlinear and the residual can. A
+configuration far off the line means the cost is superlinear in size, and then
+batching is a penalty and concurrency is the shape.
+
+The connection matters as much as the shape. `judgePage` builds a
+`typesafe.Client` per call and so pays a TLS handshake per judgement — 550 ms
+against 234 ms pooled, measured. `probe_pages.py` reports that cold-minus-warm
+delta first, because hoisting the client is a smaller change than batching and
+recovers the same kind of time.
+
+**These probes settle latency, not accuracy.** Questions are answered in
+isolation but share one state, so a batch can contaminate: the answer for `p7`
+is produced with 24 other pages in view. Both probes record the `Judgment`
+fields per page in their `--out` jsonl precisely so that can be scored against
+`corpus/v2-judged.jsonl` — one page per request — without paying for the
+judgements twice. Batching earns its place only if it holds the bar the model
+arm itself had to clear.
+
 ## Known gaps
 
 - **The text-budget curve is not here.** Sweeping how much page text the model
@@ -124,6 +178,13 @@ counted separately. A run that says "N unlabelled" has not been scored yet.
   request rebuilt in Python — and rebuilding it duplicates the question text,
   which is exactly the drift the `validate_choice` copy in `ultrafast/` already
   demonstrates. Add the knob rather than the copy.
+- **The probes copy the question text, which this file warns against.** They
+  rebuild the request in Python, so `probe_common.py` carries its own copy of
+  the prompts and class descriptions — byte-identical to `pageclass.zig` when
+  written, and free to drift after. That is deliberate and temporary: a batching
+  knob on the tool is the right home, and it is not worth adding before the
+  probes say whether batching pays. If they say it does, the knob replaces the
+  copy rather than joining it.
 - **`server_error` cannot be sampled.** It is not summonable at scale without
   abusing someone, so the rules' 5xx path is covered only by the unit tests.
 - **The site list is small and Europe-shaped.** Consent walls are
