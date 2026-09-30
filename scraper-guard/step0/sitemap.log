@@ -1,0 +1,163 @@
+mediamarkt.es          sitemap urls: 44
+mediamarkt.de          sitemap urls: 149
+saturn.de              sitemap urls: 64
+currys.co.uk           sitemap urls: 0
+argos.co.uk            sitemap urls: 50000
+johnlewis.com          sitemap urls: 0
+ao.com                 sitemap urls: 0
+boulanger.com          sitemap urls: 1780
+darty.com              sitemap urls: 0
+fnac.com               sitemap urls: 0
+elcorteingles.es       sitemap urls: 227
+worten.es              sitemap urls: 0
+pccomponentes.com      sitemap urls: 53
+coolblue.nl            sitemap urls: 5
+bcc.nl                 sitemap urls: 34
+mediaexpert.pl         sitemap urls: 0
+alza.cz                sitemap urls: 0
+elgiganten.se          sitemap urls: 0
+power.dk               sitemap urls: 506
+verkkokauppa.com       sitemap urls: 36
+newegg.com             sitemap urls: 478
+bhphotovideo.com       sitemap urls: 0
+adorama.com            sitemap urls: 154
+microcenter.com        sitemap urls: 0
+waterstones.com        sitemap urls: 0
+blackwells.co.uk       sitemap urls: 10000
+wordery.com            sitemap urls: 25000
+thriftbooks.com        sitemap urls: 0
+betterworldbooks.com   sitemap urls: 0
+bol.com                sitemap urls: 50000
+casadellibro.com       sitemap urls: 24784
+leroymerlin.es         sitemap urls: 50000
+bauhaus.de             sitemap urls: 157
+screwfix.com           sitemap urls: 400
+toolstation.com        sitemap urls: 91
+boots.com              sitemap urls: 0
+superdrug.com          sitemap urls: 24998
+decathlon.es           sitemap urls: 225
+decathlon.co.uk        sitemap urls: 26
+sportsdirect.com       sitemap urls: 448
+allegro.pl             sitemap urls: 0
+emag.ro                sitemap urls: 2126
+
+-- browser: 78 pages across 26 hosts --
+
+  mediamarkt.es        USABLE             md= 26529b oracle=925.0 money=13
+  mediamarkt.es        USABLE             md= 36743b oracle=2699.0 money=17
+  mediamarkt.es        USABLE             md= 29322b oracle=329.0 money=18
+  mediamarkt.de        USABLE             md= 55041b oracle=449.0 money=38
+  mediamarkt.de        USABLE             md= 55009b oracle=259.0 money=36
+  mediamarkt.de        no_oracle          md= 53313b oracle=None money=7
+  saturn.de            no_oracle          md= 31133b oracle=None money=4
+  saturn.de            USABLE             md= 46208b oracle=2519.99 money=37
+  saturn.de            USABLE             md= 52601b oracle=2649.0 money=42
+  argos.co.uk          USABLE             md=147833b oracle=15.0 money=9
+  argos.co.uk          USABLE             md=147737b oracle=49.0 money=10
+  argos.co.uk          USABLE             md=148560b oracle=40.0 money=10
+  boulanger.com        blank              md=     0b oracle=None money=0
+  boulanger.com        blank              md=     0b oracle=None money=0
+  boulanger.com        blank              md=     0b oracle=None money=0
+  elcorteingles.es     no_oracle          md= 18860b oracle=None money=13
+  elcorteingles.es     no_oracle          md= 14176b oracle=None money=10
+  elcorteingles.es     no_oracle          md= 15674b oracle=None money=0
+  pccomponentes.com    blank              md=   463b oracle=None money=0
+  pccomponentes.com    blank              md=   463b oracle=None money=0
+  pccomponentes.com    blank              md=   463b oracle=None money=0
+  coolblue.nl          blank              md=    35b oracle=None money=0
+  coolblue.nl          blank              md=    35b oracle=None money=0
+  coolblue.nl          blank              md=    35b oracle=None money=0
+  bcc.nl               no_oracle          md= 39833b oracle=None money=28
+  bcc.nl               no_oracle          md= 30743b oracle=None money=12
+  bcc.nl               no_oracle          md= 43346b oracle=None money=31
+  power.dk             no_oracle          md=  7927b oracle=None money=0
+  power.dk             no_oracle          md=  8325b oracle=None money=0
+  power.dk             no_oracle          md=  7717b oracle=None money=0
+  verkkokauppa.com     USABLE             md= 17834b oracle=399.99 money=3
+  verkkokauppa.com     no_decoy           md= 18032b oracle=2009.0 money=3
+  verkkokauppa.com     USABLE             md= 14096b oracle=2479.0 money=3
+  newegg.com           no_oracle          md=198619b oracle=None money=25
+  newegg.com           no_oracle          md=180650b oracle=None money=4
+  newegg.com           no_oracle          md=195754b oracle=None money=47
+  adorama.com          price_not_in_text  md= 19919b oracle=65995.0 money=19
+  adorama.com          USABLE             md= 29499b oracle=4.99 money=15
+  adorama.com          price_not_in_text  md= 11374b oracle=9348.9 money=5
+  blackwells.co.uk     blank              md=   448b oracle=None money=0
+  blackwells.co.uk     blank              md=   448b oracle=None money=0
+  blackwells.co.uk     blank              md=   448b oracle=None money=0
+  wordery.com          blank              md=   445b oracle=None money=0
+  wordery.com          blank              md=   445b oracle=None money=0
+  wordery.com          blank              md=   445b oracle=None money=0
+  bol.com              blank              md=     0b oracle=None money=0
+  bol.com              blank              md=     0b oracle=None money=0
+  bol.com              no_oracle          md=  1246b oracle=None money=0
+  casadellibro.com     no_oracle          md= 75404b oracle=None money=25
+  casadellibro.com     no_oracle          md= 75039b oracle=None money=24
+  casadellibro.com     no_oracle          md= 75317b oracle=None money=24
+  leroymerlin.es       blank              md=     0b oracle=None money=0
+  leroymerlin.es       blank              md=     0b oracle=None money=0
+  leroymerlin.es       blank              md=     0b oracle=None money=0
+  bauhaus.de           no_oracle          md= 12251b oracle=None money=0
+  bauhaus.de           no_oracle          md= 10682b oracle=None money=0
+  bauhaus.de           no_oracle          md=  6475b oracle=None money=0
+  screwfix.com         blank              md=   532b oracle=None money=0
+  screwfix.com         blank              md=   532b oracle=None money=0
+  screwfix.com         blank              md=   532b oracle=None money=0
+  toolstation.com      no_oracle          md= 42608b oracle=None money=2
+  toolstation.com      no_oracle          md= 43882b oracle=None money=2
+  toolstation.com      no_oracle          md= 39438b oracle=None money=2
+  superdrug.com        price_not_in_text  md= 11636b oracle=5.89 money=1
+  superdrug.com        price_not_in_text  md= 11772b oracle=0.4 money=1
+  superdrug.com        no_oracle          md= 11683b oracle=None money=1
+  decathlon.es         blank              md=   448b oracle=None money=0
+  decathlon.es         blank              md=   448b oracle=None money=0
+  decathlon.es         blank              md=   448b oracle=None money=0
+  decathlon.co.uk      blank              md=   457b oracle=None money=0
+  decathlon.co.uk      blank              md=   457b oracle=None money=0
+  decathlon.co.uk      blank              md=   457b oracle=None money=0
+  sportsdirect.com     USABLE             md= 95987b oracle=18.99 money=3
+  sportsdirect.com     USABLE             md= 91711b oracle=6.0 money=3
+  sportsdirect.com     USABLE             md= 95300b oracle=17.99 money=2
+  emag.ro              no_oracle          md= 52421b oracle=None money=0
+  emag.ro              no_oracle          md= 85329b oracle=None money=0
+  emag.ro              no_oracle          md= 24506b oracle=None money=0
+
+==============================================================================
+host                     pool  USABLE/seen    est
+mediamarkt.es              44       3/3        44  <= USABLE
+mediamarkt.de             149       2/3        99  <= USABLE
+saturn.de                  64       2/3        43  <= USABLE
+argos.co.uk             50000       3/3     50000  <= USABLE
+boulanger.com            1780       0/3         0
+elcorteingles.es          227       0/3         0
+pccomponentes.com          53       0/3         0
+coolblue.nl                 5       0/3         0
+bcc.nl                     34       0/3         0
+power.dk                  506       0/3         0
+verkkokauppa.com           36       2/3        24  <= USABLE
+newegg.com                478       0/3         0
+adorama.com               154       1/3        51  <= USABLE
+blackwells.co.uk        10000       0/3         0
+wordery.com             25000       0/3         0
+bol.com                 50000       0/3         0
+casadellibro.com        24784       0/3         0
+leroymerlin.es          50000       0/3         0
+bauhaus.de                157       0/3         0
+screwfix.com              400       0/3         0
+toolstation.com            91       0/3         0
+superdrug.com           24998       0/3         0
+decathlon.es              225       0/3         0
+decathlon.co.uk            26       0/3         0
+sportsdirect.com          448       3/3       448  <= USABLE
+emag.ro                  2126       0/3         0
+
+verdicts: {'USABLE': 16, 'no_oracle': 28, 'blank': 29, 'no_decoy': 1, 'price_not_in_text': 4}
+
+ESTIMATED CORPUS: 50709 pages across 7 hosts
+   argos.co.uk            ~ 50000    99%
+   sportsdirect.com       ~   448     1%
+   mediamarkt.de          ~    99     0%
+   adorama.com            ~    51     0%
+   mediamarkt.es          ~    44     0%
+   saturn.de              ~    43     0%
+   verkkokauppa.com       ~    24     0%

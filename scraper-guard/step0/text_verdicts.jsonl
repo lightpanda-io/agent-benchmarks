@@ -1,0 +1,23 @@
+{"host": "allbirds.com", "v": "BOTH", "bytes": 653494, "url": "https://allbirds.com/products/womens-allbirds-flip-flop-dusty-pink", "live": 25.0, "was": 50.0, "t": "BOTH", "md": 18820}
+{"host": "allbirds.com", "v": "BOTH", "bytes": 505821, "url": "https://allbirds.com/products/womens-wool-runner-mizzles-natural-black-1", "live": 99.0, "was": 125.0, "t": "BOTH", "md": 6786}
+{"host": "brooklinen.com", "v": "BOTH", "bytes": 900008, "url": "https://brooklinen.com/products/marlow-mini-pillow-last-call", "live": 21.0, "was": 35.0, "t": "neither", "md": 16902}
+{"host": "brooklinen.com", "v": "BOTH", "bytes": 900014, "url": "https://brooklinen.com/products/super-plush-hand-towels-last-call", "live": 33.0, "was": 55.0, "t": "was_only", "md": 18398}
+{"host": "rothys.com", "v": "neither", "bytes": 899487, "url": "https://rothys.com/products/classic-tote-bag-macadamia-open-knit", "live": 229.0, "was": 285.0, "t": "neither", "md": 32456}
+{"host": "rothys.com", "v": "BOTH", "bytes": 899263, "url": "https://rothys.com/products/kids-double-strap-sandal-firetruck-red", "live": 49.0, "was": 55.0, "t": "BOTH", "md": 35466}
+{"host": "thursdayboots.com", "v": "BOTH", "bytes": 667114, "url": "https://thursdayboots.com/products/_thrscnd_mens-natural-captain", "live": 159.0, "was": 199.0, "t": "neither", "md": 45449}
+{"host": "thursdayboots.com", "v": "BOTH", "bytes": 484928, "url": "https://thursdayboots.com/products/_thrscnd_mens-keanu-leather-jacket-old-english", "live": 270.0, "was": 360.0, "t": "neither", "md": 13801}
+{"host": "tentree.com", "v": "BOTH", "bytes": 464542, "url": "https://tentree.com/products/chambers-pocket-shirt-nightfall-midnight-blue", "live": 70.4, "was": 88.0, "t": "BOTH", "md": 17540}
+{"host": "outdoorvoices.com", "v": "BOTH", "bytes": 615775, "url": "https://outdoorvoices.com/products/w-techsweat-move-free-tank-new-blue", "live": 24.97, "was": 58.0, "t": "neither", "md": 8802}
+{"host": "outdoorvoices.com", "v": "BOTH", "bytes": 693447, "url": "https://outdoorvoices.com/products/w-the-exercise-3in-skort-blueberry", "live": 19.97, "was": 68.0, "t": "neither", "md": 14770}
+{"host": "ridge.com", "v": "neither", "bytes": 899824, "url": "https://ridge.com/products/ridge-carry-on-lavender", "live": 345.0, "was": 590.0, "t": "neither", "md": 8495}
+{"host": "ridge.com", "v": "neither", "bytes": 899787, "url": "https://ridge.com/products/ridge-carry-on-alpine-navy", "live": 345.0, "was": 590.0, "t": "neither", "md": 3530}
+{"host": "drsquatch.com", "v": "live_only", "bytes": 899960, "url": "https://drsquatch.com/products/the-launch-bundle-exclusive-gifts-nco", "live": 68.0, "was": 140.0, "t": "live_only", "md": 19777}
+{"host": "drsquatch.com", "v": "BOTH", "bytes": 899725, "url": "https://drsquatch.com/products/funboy-poolside-bundle-048-nco", "live": 47.99, "was": 72.99, "t": "was_only", "md": 13079}
+{"host": "peakdesign.com", "v": "neither", "bytes": 147884, "url": "https://peakdesign.com/products/slimlink-case-for-iphone-18-pro-max-bundle-1-sage", "live": 152.87, "was": 169.85, "t": "neither", "md": 5358}
+{"host": "peakdesign.com", "v": "neither", "bytes": 148594, "url": "https://peakdesign.com/products/slimlink-case-for-iphone-18-pro-max-bundle-1-redwood-clarino", "live": 152.87, "was": 169.85, "t": "neither", "md": 5468}
+{"host": "chubbiesshorts.com", "v": "BOTH", "bytes": 899784, "url": "https://chubbiesshorts.com/products/gradient-tiger-palm-5-5-stretch-zipper-back-pocket", "live": 40.0, "was": 69.5, "t": "BOTH", "md": 48667}
+{"host": "chubbiesshorts.com", "v": "BOTH", "bytes": 317460, "url": "https://chubbiesshorts.com/products/the-big-bloomers-4-quot-classic-lined-swim-trunk", "live": 32.0, "was": 79.5, "t": "BOTH", "md": 18912}
+{"host": "untuckit.com", "v": "BOTH", "bytes": 175104, "url": "https://untuckit.com/products/crosby-2", "live": 68.0, "was": 98.0, "t": "err"}
+{"host": "untuckit.com", "v": "neither", "bytes": 175125, "url": "https://untuckit.com/products/islington", "live": 99.0, "was": 109.0, "t": "neither", "md": 0}
+{"host": "mackweldon.com", "v": "was_only", "bytes": 38818, "url": "https://mackweldon.com/products/3-pack-airknit\u02e3-briefs-northern-skies", "live": 85.5, "was": 90.0, "t": "neither", "md": 0}
+{"host": "mackweldon.com", "v": "neither", "bytes": 38840, "url": "https://mackweldon.com/products/3-pack-18-hour-jersey-knit-boxers-long-shadows", "live": 96.9, "was": 102.0, "t": "neither", "md": 0}

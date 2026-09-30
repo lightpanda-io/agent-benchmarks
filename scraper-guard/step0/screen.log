@@ -1,0 +1,89 @@
+allbirds.com              138 sale variants
+brooklinen.com             64 sale variants
+rothys.com                 11 sale variants
+vessi.com                products.json: no sale variants
+thursdayboots.com          41 sale variants
+tentree.com                 1 sale variants
+kotn.com                 products.json: JSONDecodeError
+outdoorvoices.com         206 sale variants
+ridge.com                 111 sale variants
+drsquatch.com              11 sale variants
+peakdesign.com            132 sale variants
+hydrojug.com             products.json: no sale variants
+chubbiesshorts.com        157 sale variants
+untuckit.com               67 sale variants
+mackweldon.com            193 sale variants
+birddogs.com             products.json: http 429
+tecovas.com              products.json: http 429
+marinelayer.com          products.json: http 429
+fahertybrand.com         products.json: http 429
+buckmason.com            products.json: http 404
+taylorstitch.com         products.json: http 429
+greats.com               products.json: http 429
+olukai.com               products.json: http 429
+xeroshoes.com            products.json: http 429
+nisolo.com               products.json: http 429
+harrys.com               products.json: http 429
+ritual.com               products.json: http 429
+athleticbrewing.com      products.json: http 429
+magicspoon.com           products.json: http 429
+kettleandfire.com        products.json: http 429
+carawayhome.com          products.json: http 404
+materialkitchen.com      products.json: http 429
+madeincookware.com       products.json: http 403
+fromourplace.com         products.json: http 429
+hedleyandbennett.com     products.json: http 429
+bokksu.com               products.json: http 429
+monos.com                products.json: http 429
+nomadgoods.com           products.json: JSONDecodeError
+pelacase.com             products.json: http 429
+manscaped.com            products.json: http 404
+bulletproof.com          products.json: http 429
+foursigmatic.com         products.json: http 429
+liquiddeath.com          products.json: http 429
+drinkolipop.com          products.json: http 429
+
+-- browser screen: 23 pages --
+
+  allbirds.com             BOTH        653494b live=25.0 was=50.0
+  allbirds.com             BOTH        505821b live=99.0 was=125.0
+  brooklinen.com           BOTH        900008b live=21.0 was=35.0
+  brooklinen.com           BOTH        900014b live=33.0 was=55.0
+  rothys.com               neither     899487b live=229.0 was=285.0
+  rothys.com               BOTH        899263b live=49.0 was=55.0
+  thursdayboots.com        BOTH        667114b live=159.0 was=199.0
+  thursdayboots.com        BOTH        484928b live=270.0 was=360.0
+  tentree.com              BOTH        464542b live=70.4 was=88.0
+  outdoorvoices.com        BOTH        615775b live=24.97 was=58.0
+  outdoorvoices.com        BOTH        693447b live=19.97 was=68.0
+  ridge.com                neither     899824b live=345.0 was=590.0
+  ridge.com                neither     899787b live=345.0 was=590.0
+  drsquatch.com            live_only   899960b live=68.0 was=140.0
+  drsquatch.com            BOTH        899725b live=47.99 was=72.99
+  peakdesign.com           neither     147884b live=152.87 was=169.85
+  peakdesign.com           neither     148594b live=152.87 was=169.85
+  chubbiesshorts.com       BOTH        899784b live=40.0 was=69.5
+  chubbiesshorts.com       BOTH        317460b live=32.0 was=79.5
+  untuckit.com             BOTH        175104b live=68.0 was=98.0
+  untuckit.com             neither     175125b live=99.0 was=109.0
+  mackweldon.com           was_only     38818b live=85.5 was=90.0
+  mackweldon.com           neither      38840b live=96.9 was=102.0
+
+============================================================================
+host                      pool  BOTH/seen  est. usable decoy pages
+allbirds.com               138     2/2       138  <= USABLE
+brooklinen.com              64     2/2        64  <= USABLE
+chubbiesshorts.com         157     2/2       157  <= USABLE
+drsquatch.com               11     1/2         6  <= USABLE
+mackweldon.com             193     0/2         0
+outdoorvoices.com          206     2/2       206  <= USABLE
+peakdesign.com             132     0/2         0
+ridge.com                  111     0/2         0
+rothys.com                  11     1/2         6  <= USABLE
+tentree.com                  1     1/1         1  <= USABLE
+thursdayboots.com           41     2/2        41  <= USABLE
+untuckit.com                67     1/2        34  <= USABLE
+
+verdicts: {'BOTH': 14, 'neither': 7, 'live_only': 1, 'was_only': 1}
+ESTIMATED USABLE DECOY PAGES (both prices server-rendered): 653
+usable hosts: 9 -> allbirds.com, brooklinen.com, chubbiesshorts.com, drsquatch.com, outdoorvoices.com, rothys.com, tentree.com, thursdayboots.com, untuckit.com

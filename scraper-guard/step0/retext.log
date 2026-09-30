@@ -1,0 +1,47 @@
+  allbirds.com         html=BOTH       text=BOTH       md= 18820b live=25.0 was=50.0
+  allbirds.com         html=BOTH       text=BOTH       md=  6786b live=99.0 was=125.0
+  brooklinen.com       html=BOTH       text=neither    md= 16902b live=21.0 was=35.0
+  brooklinen.com       html=BOTH       text=was_only   md= 18398b live=33.0 was=55.0
+  rothys.com           html=neither    text=neither    md= 32456b live=229.0 was=285.0
+  rothys.com           html=BOTH       text=BOTH       md= 35466b live=49.0 was=55.0
+  thursdayboots.com    html=BOTH       text=neither    md= 45449b live=159.0 was=199.0
+  thursdayboots.com    html=BOTH       text=neither    md= 13801b live=270.0 was=360.0
+  tentree.com          html=BOTH       text=BOTH       md= 17540b live=70.4 was=88.0
+  outdoorvoices.com    html=BOTH       text=neither    md=  8802b live=24.97 was=58.0
+  outdoorvoices.com    html=BOTH       text=neither    md= 14770b live=19.97 was=68.0
+  ridge.com            html=neither    text=neither    md=  8495b live=345.0 was=590.0
+  ridge.com            html=neither    text=neither    md=  3530b live=345.0 was=590.0
+  drsquatch.com        html=live_only  text=live_only  md= 19777b live=68.0 was=140.0
+  drsquatch.com        html=BOTH       text=was_only   md= 13079b live=47.99 was=72.99
+  peakdesign.com       html=neither    text=neither    md=  5358b live=152.87 was=169.85
+  peakdesign.com       html=neither    text=neither    md=  5468b live=152.87 was=169.85
+  chubbiesshorts.com   html=BOTH       text=BOTH       md= 48667b live=40.0 was=69.5
+  chubbiesshorts.com   html=BOTH       text=BOTH       md= 18912b live=32.0 was=79.5
+  untuckit.com         ERR navigation failed: OperationTimedout
+  untuckit.com         html=neither    text=neither    md=     0b live=99.0 was=109.0
+  mackweldon.com       html=was_only   text=neither    md=     0b live=85.5 was=90.0
+  mackweldon.com       html=neither    text=neither    md=     0b live=96.9 was=102.0
+
+==========================================================================
+host                  pool  BOTH/seen   est
+allbirds.com           138     2/2      138  <= USABLE
+brooklinen.com          64     0/2        0
+chubbiesshorts.com     157     2/2      157  <= USABLE
+drsquatch.com           11     0/2        0
+mackweldon.com         193     0/2        0
+outdoorvoices.com      206     0/2        0
+peakdesign.com         132     0/2        0
+ridge.com              111     0/2        0
+rothys.com              11     1/2        6  <= USABLE
+tentree.com              1     1/1        1  <= USABLE
+thursdayboots.com       41     0/2        0
+untuckit.com            67     0/1        0
+
+html-criterion verdicts: {'BOTH': 14, 'neither': 7, 'live_only': 1, 'was_only': 1}
+TEXT-criterion verdicts: {'BOTH': 6, 'neither': 13, 'was_only': 2, 'live_only': 1, 'err': 1}
+
+ESTIMATED CORPUS (both prices in the markdown the model sees): 302 pages, 4 hosts
+   chubbiesshorts.com     ~ 157  (52% of corpus)
+   allbirds.com           ~ 138  (46% of corpus)
+   rothys.com             ~   6  (2% of corpus)
+   tentree.com            ~   1  (0% of corpus)
