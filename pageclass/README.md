@@ -163,6 +163,45 @@ against 234 ms pooled, measured. `probe_pages.py` reports that cold-minus-warm
 delta first, because hoisting the client is a smaller change than batching and
 recovers the same kind of time.
 
+### What the first campaign found, 2026-09-30
+
+Direct endpoint, `jev-1.13.0`, 43 unsettled rows from `v2.jsonl`, 3 repeats.
+
+| | |
+| --- | --- |
+| fixed per request (`A`) | 205–229 ms |
+| of which the TLS handshake | 55 ms |
+| marginal (`B`) | 8–12 ms per 1k input tokens |
+| per question | +1.4 ms, +148 input tokens |
+| 25 pages in one request | 362 ms (322–391) |
+| 25 pages one at a time | ~220 ms each, ~5.5 s |
+
+**Ingest is nearly free and the round trip is almost the whole cost.** 13.5k
+tokens of state buys about 150 ms. So batching 25 pages is ~15x faster than
+sequential, and it is also **~16% cheaper**: 27.7k tokens for one 25-page
+request against ~32.8k for 25 single-page ones, which repeat the per-request
+scaffolding 25 times. Against 25 *concurrent* requests it is a wash on wall
+clock — both land near one request's latency — and batching wins only on
+holding one connection instead of 25, and on those tokens.
+
+Asking about every page rather than one adds 96 questions, doubles the input
+tokens and costs 134 ms, so the question axis is cheap in time and not in
+tokens. Each question carries its own copy of the rules; moving the shared
+rules into the state and referencing them per question is the obvious next
+trim, and `probe_questions.py` measures it.
+
+`probe_score.py` scores the answers the campaign already paid for: 23/25 agreed
+with the per-page judgement, and against the human labels the batched arm went
+22/24 where per-page went 20/24 — two rows either way, which is noise, not a
+result. It is also not a clean A/B: the batched arm sees each page's text at
+`result_text_budget` and the judged file was produced at `text_prefix_cap`.
+
+**One page answered differently across identical repeats** (a lemonde 404, twice
+`server_error` and once `loading`). `judgePage` disables retries on the grounds
+that a calibrated decoder returns the same answer for the same state; on this
+evidence that holds for 24 of 25 pages and not for the 25th. Worth re-checking
+per-page before more is built on it.
+
 **These probes settle latency, not accuracy.** Questions are answered in
 isolation but share one state, so a batch can contaminate: the answer for `p7`
 is produced with 24 other pages in view. Both probes record the `Judgment`

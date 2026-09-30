@@ -291,21 +291,24 @@ class Session:
 
 
 def connect_overhead(base_url, key, body, samples=3):
-    """Cold minus warm for the same body: what a per-call client pays per judgement.
+    """The handshake, timed on its own, against a request on the warm connection.
 
-    The whole case for batching is the fixed per-request cost, and on the
-    current path a TLS handshake is part of it.
+    `post_json` connects before it starts its clock, so a first-request-versus-
+    second comparison would put the handshake in neither. What a per-call client
+    pays per judgement is this connect time, and the fixed per-request cost is
+    the whole case for batching, so it matters which part of it is the socket.
     """
-    cold, warm = [], []
+    connects, warm = [], []
     for _ in range(samples):
         session = Session(base_url, key)
+        started = time.perf_counter()
         session.connect()
-        _, first, _ = session.post_json(body)
+        connects.append((time.perf_counter() - started) * 1000)
+        session.post_json(body)
         _, second, _ = session.post_json(body)
         session.close()
-        cold.append(first)
         warm.append(second)
-    return statistics.median(cold), statistics.median(warm)
+    return statistics.median(connects), statistics.median(warm)
 
 
 # --- campaign ---

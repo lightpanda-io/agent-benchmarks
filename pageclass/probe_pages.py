@@ -49,9 +49,9 @@ def main():
     print(f"{len(rows)} usable rows, model {model}, {args.repeats} repeats")
 
     if not args.skip_connect:
-        cold, warm = common.connect_overhead(base, key, configs[0].body)
-        print(f"connection: cold {cold:.0f} ms, warm {warm:.0f} ms "
-              f"-> {cold - warm:.0f} ms per request for a client that does not pool\n")
+        connect, warm = common.connect_overhead(base, key, configs[0].body)
+        print(f"connection: {connect:.0f} ms to establish, {warm:.0f} ms for a request on it "
+              f"-> {connect:.0f} ms per judgement for a client that does not pool\n")
 
     session = common.Session(base, key)
     try:
