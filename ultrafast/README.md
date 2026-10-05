@@ -68,19 +68,25 @@ lifted out of the goal.
 | `quotes` | quotes.toscrape.com | SELECT → server postback → SELECT → submit |
 | `wikipedia` | en.wikipedia.org | TYPE_TEXT → search → land on the article |
 | `hn` | news.ycombinator.com | one CLICK, out of ~120 offered elements on a link-dense page |
+| `hostelworld` | hostelworld.com | apply the parking filter → open the matching hostel |
 
 `hotel` is the headline: browser-use's own `static/fixture.html`, vendored
 unmodified and served from loopback, so both engines see identical bytes and the
 number is not network noise. It is the same workflow upstream published at
-1.896 s. The other three are live, for credibility, and carry live variance.
+1.896 s. The others are live, for credibility, and carry live variance.
+`hostelworld` is not part of the campaigns below.
 
 Every task is judged by a checker in `tasks.py` that runs after the clock stops,
 against a fresh unclipped read of the page — `document.body.innerText` on Chrome,
 `markdown` on Lightpanda. `DONE` is the model's opinion and never counts as
-evidence. `hn` resolves the expected story id by fetching the front page itself,
-before the run, so the answer never comes from the browser under test.
+evidence. `hn` and `hostelworld` resolve the expected answer by fetching the
+page themselves, before the run, so it never comes from the browser under test.
 
 ## Results (`results/v5-direct`, `results/v6-direct-jev`, `results/fleet-direct`)
+
+`results/` is gitignored: the campaign directories named here live on the machine
+that ran them and are not in the repository. Re-run `bench.py` and `fleet.py` to
+reproduce the numbers rather than expecting to find the raw runs.
 
 All campaigns ran one binary: **ReleaseFast, main `7f4387b9c`**, sha256 `c2ec817c…`,
 copied read-only into `.bench-bin/` so an editor build cannot swap it
@@ -139,7 +145,8 @@ smaller (70%, 49%, 34% of the table, recorded as `request_shrinks` /
 gateway run degrades instead of dying.
 
 The four gateway-era campaigns are kept in `results/{v1-noretrycol,v2,v3,v4}` for
-comparison; **do not mix their seconds with these**.
+comparison on the same machine (also not committed); **do not mix their seconds
+with these**.
 
 ## What is shared and what is not
 
@@ -175,12 +182,11 @@ Three consequences worth stating rather than burying:
 
 ## Caveats to keep attached to any number here
 
-- Four tasks and a handful of repeats is a demo, not a benchmark. The benchmark
+- A handful of tasks and repeats is a demo, not a benchmark. The benchmark
   is GAIA/AssistantBench in `../src/agent_benchmarks`.
 - The chat arm gets exactly what Jev gets — same table, same `recent_actions`
   window, same NEXT_ACTION/TARGET text — and answers in one turn. It does **not**
-  carry a growing conversation, unlike `../jev-vs-chat`'s chat arm, so its token
-  bill here is much lower than a conversational agent's would be.
+  carry a growing conversation, so its token bill here is much lower than a conversational agent's would be.
 - The two deciders are not retried on equal terms, on purpose. An invalid Jev
   answer ends the step: a calibrated decoder returns the same answer for the same
   state, so re-asking would only burn tokens. A chat model does not, so a
