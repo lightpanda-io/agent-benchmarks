@@ -167,7 +167,7 @@ def parse_tool_trace(stderr: str) -> list[dict[str, Any]]:
 
 
 def parse_lightpanda_usage(stderr: str) -> dict[str, Any] | None:
-    """Pull the `$usage prompt=… completion=… …` summary line that
+    """Pull the `$usage input=… cached=… cache_creation=… output=…` line that
     `lightpanda agent --task` writes to stderr at end of one-shot mode.
     Returns the parsed usage dict or None if the line is absent (older
     binaries, or runs that crashed before printing it).
@@ -193,11 +193,15 @@ def parse_lightpanda_usage(stderr: str) -> dict[str, Any] | None:
         # Normalize to the same shape the MCP path emits (input_tokens etc.)
         # so downstream summarize_usage and the progress-line formatter
         # handle both paths uniformly.
+        # `input` counts cache reads and writes too; this shape's
+        # `input_tokens` is the fresh part only.
+        cached = out.get("cached", 0)
+        cache_creation = out.get("cache_creation", 0)
         return {
-            "input_tokens": out.get("prompt", 0),
-            "output_tokens": out.get("completion", 0),
-            "cache_read_input_tokens": out.get("cached", 0),
-            "cache_creation_input_tokens": out.get("cache_creation", 0),
+            "input_tokens": out.get("input", 0) - cached - cache_creation,
+            "output_tokens": out.get("output", 0),
+            "cache_read_input_tokens": cached,
+            "cache_creation_input_tokens": cache_creation,
             "num_turns": 0,  # native agent doesn't expose per-turn count
             "final_turn_input_tokens": 0,  # likewise
             "total_cost_usd": None,  # native path doesn't compute this itself
