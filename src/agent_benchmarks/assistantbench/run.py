@@ -25,6 +25,7 @@ from datasets import load_dataset  # type: ignore[import-not-found]
 
 from ..common import (
     add_common_runner_args,
+    answer_source_patterns,
     emit_scores,
     extract_answer_envelope,
     load_completed_ids,
@@ -138,6 +139,7 @@ def main(argv: list[str] | None = None) -> int:
             system_prompt=SYSTEM_PROMPT,
             task_prompt=TASK_PROMPT_TEMPLATE.format(task=row["task"]),
             timeout_s=args.timeout,
+            block_urls=answer_source_patterns(args),
         )
         pred, envelope_note = extract_answer_envelope(pred)
         if envelope_note:

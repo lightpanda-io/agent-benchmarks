@@ -35,6 +35,7 @@ from datasets import load_dataset  # type: ignore[import-not-found]
 
 from ..common import (
     add_common_runner_args,
+    answer_source_patterns,
     emit_scores,
     extract_answer_envelope,
     load_completed_ids,
@@ -252,6 +253,7 @@ def main(argv: list[str] | None = None) -> int:
                         file=sys.stderr,
                     )
                     attachment = raw
+
         def _attempt() -> dict[str, Any]:
             raw_pred, duration_s, timed_out, stderr_tail, rc, trace, usage = run_lightpanda_task(
                 lightpanda=lightpanda,
@@ -262,6 +264,7 @@ def main(argv: list[str] | None = None) -> int:
                 task_prompt=TASK_PROMPT_TEMPLATE.format(task=row["Question"]),
                 attachment=attachment,
                 timeout_s=args.timeout,
+                block_urls=answer_source_patterns(args),
             )
             pred, envelope_note = extract_answer_envelope(raw_pred)
             if envelope_note:

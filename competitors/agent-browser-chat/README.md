@@ -22,6 +22,16 @@ three things in `cli/src/chat.rs`:
 `cli/src/native/stream/chat.rs` (the dashboard stream) gets the same budget
 change.
 
+One more change is in `cli/src/native/actions.rs`:
+
+- **Blocked URLs.** `AGENT_BROWSER_BLOCKED_URLS` (comma-separated, `*`
+  wildcards, `network route` matching) becomes abort routes when the daemon
+  starts. Fetch interception is switched on before each navigation and on
+  every new tab, so blocked pages and in-page `fetch()` calls fail on both
+  Chrome and Lightpanda. The runners set it with `--block-answer-sources`.
+  Stock agent-browser only has an allow-list (`--allowed-domains`), which
+  works per host and can't block just part of a site.
+
 ## Build
 
 ```bash

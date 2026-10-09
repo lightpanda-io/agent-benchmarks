@@ -45,6 +45,28 @@ ANSWER_SOURCES = re.compile(
     re.IGNORECASE,
 )
 
+# URL patterns that `--block-answer-sources` refuses, in Lightpanda's
+# `--block-urls` syntax: the whole URL, case-insensitive, `*` matches
+# anything. agent-browser's routes accept the same patterns. Narrower than
+# ANSWER_SOURCES where a broad match would block legitimate sources: all
+# of Hugging Face's datasets and Spaces go, but not its models or docs. A
+# search engine URL whose query names the benchmark is blocked too.
+BLOCKED_URL_PATTERNS = [
+    "*huggingface.co/datasets/*",
+    "*huggingface.co/spaces/*",
+    "*hf.co/datasets/*",
+    "*hf.co/spaces/*",
+    "*datasets-server.huggingface.co*",
+    "*gaia-benchmark*",
+    "*assistantbench*",
+    "*github*gaia*",
+    "*harbor-datasets*",
+    "*evalscope*",
+    "*leaderboard.neurometric*",
+    "*paperswithcode.com/dataset*",
+    "*metadata.jsonl*",
+]
+
 # Score a task must reach to count as correct, per suite.
 STRICT_THRESHOLD = {"gaia": 1.0, "assistantbench": 0.5}
 

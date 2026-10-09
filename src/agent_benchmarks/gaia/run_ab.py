@@ -56,6 +56,7 @@ from .._agent_browser import (
     run_agent_browser_task,
 )
 from ..common import (
+    answer_source_patterns,
     emit_scores,
     load_completed_ids,
     resolve_out_dir,
@@ -300,6 +301,7 @@ def main(argv: list[str] | None = None) -> int:
                 timeout_s=args.timeout,
                 engine=args.engine,
                 lightpanda=args.lightpanda,
+                block_urls=answer_source_patterns(args),
             )
         finally:
             pool.put(session)
