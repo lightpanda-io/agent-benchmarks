@@ -127,6 +127,8 @@ def run_agent_browser_task(
     model: str | None,
     message: str,
     timeout_s: float,
+    engine: str = "chrome",
+    lightpanda: str | None = None,
 ) -> tuple[str, float, bool, str, int | None]:
     """Run a single task through `agent-browser chat -q`.
 
@@ -167,6 +169,21 @@ def run_agent_browser_task(
             if stripped is not None:
                 env["AI_GATEWAY_MODEL"] = stripped
 
+    # agent-browser reads these at daemon-spawn time; the per-worker session
+    # name is engine-scoped by the caller so a Chrome daemon is never reused.
+    if engine == "lightpanda":
+        if not lightpanda:
+            raise ValueError("--lightpanda is required with --engine lightpanda")
+        env["AGENT_BROWSER_ENGINE"] = "lightpanda"
+        env["AGENT_BROWSER_EXECUTABLE_PATH"] = lightpanda
+
+    # Stock chat caps a run at 300s / 50 steps. Our patched build
+    # (.ab-flash38/chat-budget.patch) reads these instead, so the chat loop
+    # gets the same wall-clock budget as the native agent; time, not steps,
+    # is the binding limit. Ignored by an unpatched binary.
+    env["AGENT_BROWSER_CHAT_TIMEOUT_S"] = str(int(timeout_s))
+    env["AGENT_BROWSER_CHAT_MAX_STEPS"] = "1000"
+
     started = time.monotonic()
     timed_out = False
     returncode: int | None = None
@@ -177,7 +194,9 @@ def run_agent_browser_task(
             text=True,
             encoding="utf-8",
             errors="replace",
-            timeout=timeout_s,
+            # Margin so the chat loop's own deadline fires first and still
+            # emits its JSON envelope.
+            timeout=timeout_s + 60,
             env=env,
             check=False,
         )
@@ -279,6 +298,17 @@ def add_common_agent_browser_args(parser: Any) -> None:
         "Defaults to whatever agent-browser picks (currently claude-sonnet-4.6).",
     )
     parser.add_argument(
+        "--engine",
+        default="chrome",
+        choices=["chrome", "lightpanda"],
+        help="Browser engine under agent-browser (lightpanda needs --lightpanda)",
+    )
+    parser.add_argument(
+        "--lightpanda",
+        default=None,
+        help="Lightpanda binary for --engine lightpanda",
+    )
+    parser.add_argument(
         "--split",
         default="validation",
         choices=["validation", "test"],
@@ -294,9 +324,9 @@ def add_common_agent_browser_args(parser: Any) -> None:
         "--timeout",
         type=float,
         default=300.0,
-        help="Per-task subprocess timeout in seconds. agent-browser caps each "
-        "chat turn at 300s internally, so values above 300 don't extend a "
-        "stuck turn — they just give the daemon more time to wind down.",
+        help="Per-task chat budget in seconds (passed as "
+        "AGENT_BROWSER_CHAT_TIMEOUT_S; stock agent-browser ignores it and "
+        "caps at 300s). The subprocess gets 60s extra to wind down.",
     )
     parser.add_argument(
         "--out-dir",

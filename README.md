@@ -240,7 +240,16 @@ uv run gaia-ab-run --model google/gemini-3.5-flash
 # Or direct to Google's OpenAI-compat endpoint (bypasses Vercel)
 export GEMINI_DIRECT=1
 uv run assistantbench-ab-run --model gemini-3.5-flash
+
+# Lightpanda as the engine instead of Chrome
+uv run gaia-ab-run --engine lightpanda --lightpanda $LP --model gemini-3.5-flash
 ```
+
+Direct-Gemini runs with multi-step tasks, and any run longer than 300 s per
+task, need a patched agent-browser build. Stock `chat` drops Gemini's thought
+signatures and stops at 300 s / 50 steps. See
+[`competitors/agent-browser-chat/`](competitors/agent-browser-chat/README.md)
+for the patch and build steps.
 
 
 ## Comparability across frameworks

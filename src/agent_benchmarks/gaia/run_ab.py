@@ -238,7 +238,9 @@ def main(argv: list[str] | None = None) -> int:
 
     out_dir = resolve_out_dir(args.out_dir, PROJECT_ROOT, "gaia-ab")
     predictions_path = out_dir / "predictions.jsonl"
-    write_run_manifest(out_dir, agent_provider="agent-browser", agent_model=args.model)
+    write_run_manifest(
+        out_dir, agent_provider=f"agent-browser-{args.engine}", agent_model=args.model
+    )
 
     completed = load_completed_ids(predictions_path) if args.resume else set()
     if completed:
@@ -276,7 +278,7 @@ def main(argv: list[str] | None = None) -> int:
 
     pending = [r for r in rows if r["task_id"] not in completed]
 
-    pool = make_session_pool(args.workers, prefix="ab-bench-gaia")
+    pool = make_session_pool(args.workers, prefix=f"ab-bench-gaia-{args.engine}")
 
     def _work(row: dict[str, Any]) -> dict[str, Any]:
         attachment_path: Path | None = None
@@ -296,6 +298,8 @@ def main(argv: list[str] | None = None) -> int:
                 model=args.model,
                 message=message,
                 timeout_s=args.timeout,
+                engine=args.engine,
+                lightpanda=args.lightpanda,
             )
         finally:
             pool.put(session)

@@ -131,7 +131,9 @@ def main(argv: list[str] | None = None) -> int:
 
     out_dir = resolve_out_dir(args.out_dir, PROJECT_ROOT, "assistantbench-ab")
     predictions_path = out_dir / "predictions.jsonl"
-    write_run_manifest(out_dir, agent_provider="agent-browser", agent_model=args.model)
+    write_run_manifest(
+        out_dir, agent_provider=f"agent-browser-{args.engine}", agent_model=args.model
+    )
 
     completed = load_completed_ids(predictions_path) if args.resume else set()
     if completed:
@@ -145,7 +147,7 @@ def main(argv: list[str] | None = None) -> int:
 
     pending = [r for r in rows if r["id"] not in completed]
 
-    pool = make_session_pool(args.workers, prefix="ab-bench-asb")
+    pool = make_session_pool(args.workers, prefix=f"ab-bench-asb-{args.engine}")
 
     def _work(row: dict[str, Any]) -> dict[str, Any]:
         session = pool.get()
@@ -157,6 +159,8 @@ def main(argv: list[str] | None = None) -> int:
                 model=args.model,
                 message=message,
                 timeout_s=args.timeout,
+                engine=args.engine,
+                lightpanda=args.lightpanda,
             )
         finally:
             pool.put(session)
