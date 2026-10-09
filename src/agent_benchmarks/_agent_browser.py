@@ -129,13 +129,14 @@ def run_agent_browser_task(
     timeout_s: float,
     engine: str = "chrome",
     lightpanda: str | None = None,
-) -> tuple[str, float, bool, str, int | None]:
-    """Run a single task through `agent-browser chat -q`.
+) -> tuple[str, float, bool, str, int | None, list[dict[str, Any]]]:
+    """Run a single task through `agent-browser chat --json`.
 
-    Returns (prediction, duration_s, timed_out, stderr_tail, returncode).
-    No tool-trace field — agent-browser's chat output format isn't the same
-    `[tool: ...] / [result: ...]` shape Lightpanda emits, and graders never
-    look at traces anyway.
+    Returns (prediction, duration_s, timed_out, stderr_tail, returncode, trace).
+    `trace` holds chat's tool calls in the same `{tool, args, output}` shape
+    the Lightpanda runner records, so leak audits read both. Chat only
+    reports them on success: a run that hits its deadline or errors out
+    leaves the trace empty.
     """
     effective_model = _strip_provider_prefix(model) if gemini_direct_enabled() else model
 
@@ -218,7 +219,7 @@ def run_agent_browser_task(
 
     duration_s = time.monotonic() - started
 
-    prediction, error_from_json = _parse_chat_json_stdout(stdout)
+    prediction, error_from_json, trace = _parse_chat_json_stdout(stdout)
 
     # In --json mode, agent-browser routes ALL errors to stdout as the JSON
     # error envelope and prints nothing to stderr — so a failing run leaves
@@ -233,13 +234,36 @@ def run_agent_browser_task(
     else:
         stderr_tail = stderr
 
-    return prediction, duration_s, timed_out, stderr_tail, returncode
+    return prediction, duration_s, timed_out, stderr_tail, returncode, trace
 
 
-def _parse_chat_json_stdout(stdout: str) -> tuple[str, str | None]:
+# Per-call output kept in the trace; snapshots and page dumps run long.
+TRACE_OUTPUT_BYTES = 4 * 1024
+
+
+def _trace_from_tool_calls(tool_calls: Any) -> list[dict[str, Any]]:
+    """Chat's `[{"command": "open https://...", "output": "..."}]` as
+    `[{"tool": "open", "args": {"command": ...}, "output": ...}]`."""
+    if not isinstance(tool_calls, list):
+        return []
+    trace: list[dict[str, Any]] = []
+    for call in tool_calls:
+        if not isinstance(call, dict):
+            continue
+        command = str(call.get("command", ""))
+        output = str(call.get("output", ""))
+        if len(output) > TRACE_OUTPUT_BYTES:
+            output = output[:TRACE_OUTPUT_BYTES] + "...[truncated]"
+        trace.append(
+            {"tool": command.split(" ", 1)[0], "args": {"command": command}, "output": output}
+        )
+    return trace
+
+
+def _parse_chat_json_stdout(stdout: str) -> tuple[str, str | None, list[dict[str, Any]]]:
     """Extract the AI's text response from agent-browser's `chat --json` stdout.
 
-    Returns (prediction, error_message). `error_message` is non-None when
+    Returns (prediction, error_message, trace). `error_message` is non-None when
     chat reported `success: false`, so callers can surface the message
     instead of swallowing it (chat sends NOTHING to stderr in --json mode,
     so without this the failure is invisible in predictions.jsonl).
@@ -258,7 +282,7 @@ def _parse_chat_json_stdout(stdout: str) -> tuple[str, str | None]:
     """
     stripped = stdout.strip()
     if not stripped:
-        return "", None
+        return "", None, []
 
     # agent-browser emits exactly one JSON object on stdout per --json run
     # (chat.rs:379, single trailing println!). Decode the whole thing — do NOT
@@ -270,17 +294,18 @@ def _parse_chat_json_stdout(stdout: str) -> tuple[str, str | None]:
     except json.JSONDecodeError:
         # Not valid JSON — fall back to the raw stdout. Better than dropping
         # output silently if the contract drifts.
-        return stripped, None
+        return stripped, None, []
 
     if not isinstance(obj, dict):
-        return stripped, None
+        return stripped, None, []
     if obj.get("success") is False:
         err = obj.get("error", "")
-        return "", str(err) if err else "chat --json reported success=false with no message"
+        return "", str(err) if err else "chat --json reported success=false with no message", []
+    trace = _trace_from_tool_calls(obj.get("tool_calls"))
     text = obj.get("text", "")
     if not isinstance(text, str):
-        return "", None
-    return text.strip(), None
+        return "", None, trace
+    return text.strip(), None, trace
 
 
 def add_common_agent_browser_args(parser: Any) -> None:
