@@ -39,7 +39,7 @@ ANSWER_SOURCES = re.compile(
     r"|leaderboard\."
     r"|paperswithcode"
     r"|Who_and_When"
-    r"|GAIA-modified|gaia_subset|gaia-benchmark"
+    r"|GAIA-modified|gaia_subset|gaia-benchmark|gaia( |\+|%20)benchmark"
     r"|metadata\.jsonl"
     r"|assistantbench",
     re.IGNORECASE,
@@ -59,6 +59,11 @@ BLOCKED_URL_PATTERNS = [
     "*datasets-server.huggingface.co*",
     "*gaia-benchmark*",
     "*assistantbench*",
+    # "GAIA benchmark" as typed, in a URL query, or URL-encoded; plain
+    # "gaia" would also block questions about the Gaia spacecraft.
+    "*gaia benchmark*",
+    "*gaia+benchmark*",
+    "*gaia%20benchmark*",
     "*github*gaia*",
     "*harbor-datasets*",
     "*evalscope*",
