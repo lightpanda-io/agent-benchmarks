@@ -37,6 +37,8 @@ import time
 from pathlib import Path
 from typing import Any
 
+from .common import add_block_answer_sources_arg
+
 STDERR_TAIL_BYTES = 8 * 1024
 
 
@@ -129,6 +131,7 @@ def run_agent_browser_task(
     timeout_s: float,
     engine: str = "chrome",
     lightpanda: str | None = None,
+    block_urls: list[str] | None = None,
 ) -> tuple[str, float, bool, str, int | None, list[dict[str, Any]]]:
     """Run a single task through `agent-browser chat --json`.
 
@@ -177,6 +180,11 @@ def run_agent_browser_task(
             raise ValueError("--lightpanda is required with --engine lightpanda")
         env["AGENT_BROWSER_ENGINE"] = "lightpanda"
         env["AGENT_BROWSER_EXECUTABLE_PATH"] = lightpanda
+
+    # Read by the daemon when it starts: abort routes for these patterns on
+    # every page session (patched build, see competitors/agent-browser-chat).
+    if block_urls:
+        env["AGENT_BROWSER_BLOCKED_URLS"] = ",".join(block_urls)
 
     # Stock chat caps a run at 300s / 50 steps. Our patched build
     # (.ab-flash38/chat-budget.patch) reads these instead, so the chat loop
@@ -364,3 +372,4 @@ def add_common_agent_browser_args(parser: Any) -> None:
         action="store_true",
         help="Skip task ids already present in <out-dir>/predictions.jsonl",
     )
+    add_block_answer_sources_arg(parser)

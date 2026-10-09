@@ -35,6 +35,7 @@ from datasets import load_dataset  # type: ignore[import-not-found]
 
 from ..common import (
     add_common_runner_args,
+    answer_source_patterns,
     emit_scores,
     extract_answer_envelope,
     load_completed_ids,
@@ -113,17 +114,18 @@ def _preprocess_attachment(path: Path) -> Path:
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 SYSTEM_PROMPT = """\
-You are a research assistant driving the Lightpanda headless browser on the GAIA QA benchmark.
+You are a research assistant driving the Lightpanda headless browser to answer a research question.
 
 The Lightpanda browser tools are the ONLY way you can access the web. There is no WebSearch, no WebFetch, no shortcut — you must navigate real pages. Your tool surface includes `search`, `goto`, `tree`, `markdown`, `extract`, `structuredData`, `findElement`, `interactiveElements`, `links`, `click`, `fill`, `hover`, `selectOption`, `setChecked`, `press`, `scroll`, `waitForSelector`, `nodeDetails`, `getUrl`, `eval`, `consoleLogs`, `detectForms`.
 
 BE PERSISTENT — this is the load-bearing instruction:
-- GAIA tasks expect multi-step browsing. Most need 20-50 tool calls; some need 100+. Answers from prior knowledge without browsing score 0.
+- These questions need multi-step browsing. Most need 20-50 tool calls; some need 100+. Answers from prior knowledge without browsing score 0.
 - If a search returns poor results, try DIFFERENT phrasings — synonyms, narrower queries, different angles.
 - If a page is unreachable, find a DIFFERENT source. Wikipedia, official sites, archived pages, news outlets.
 - If extraction fails, try a different tool (markdown → tree → extract → structuredData → findElement).
 - Do NOT respond "unknown" or fall back to prior knowledge until you have made at least 20 substantive tool calls AND tried at least 3 different sources/angles.
 - Small-candidate questions ("A, B, or C", yes/no): always pick one — never abstain.
+- Find the answer from primary sources. Don't look up this exact question or its answer in datasets, research papers, evaluation logs or other agents' outputs.
 
 Strategy:
 1. Plan: prefer authoritative direct sources (Wikipedia, official sites) over search-engine landing pages when you know where to go.
@@ -135,7 +137,7 @@ Final-answer envelope — STRICT
 ================================
 Your entire response will be discarded except for the LAST text wrapped in `<ANSWER>...</ANSWER>` tags. Reasoning, tool-call narration, partial-credit notes — anything outside the envelope — is ignored. Only the envelope contents are graded.
 
-GAIA grades by exact match after normalization (lowercase, strip articles/punct).
+Answers are graded by exact match after normalization (lowercase, strip articles/punct).
 
 Format INSIDE the envelope:
 - No preface, no explanation, no markdown, no source citations.
@@ -252,6 +254,7 @@ def main(argv: list[str] | None = None) -> int:
                         file=sys.stderr,
                     )
                     attachment = raw
+
         def _attempt() -> dict[str, Any]:
             raw_pred, duration_s, timed_out, stderr_tail, rc, trace, usage = run_lightpanda_task(
                 lightpanda=lightpanda,
@@ -262,6 +265,7 @@ def main(argv: list[str] | None = None) -> int:
                 task_prompt=TASK_PROMPT_TEMPLATE.format(task=row["Question"]),
                 attachment=attachment,
                 timeout_s=args.timeout,
+                block_urls=answer_source_patterns(args),
             )
             pred, envelope_note = extract_answer_envelope(raw_pred)
             if envelope_note:

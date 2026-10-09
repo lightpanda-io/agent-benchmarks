@@ -46,6 +46,7 @@ def extract_answer_envelope(prediction: str) -> tuple[str, str | None]:
         return prediction, "no <ANSWER> envelope found; using raw result"
     return matches[-1].strip(), None
 
+
 # Cap each Lightpanda subprocess's memory + swap via a systemd-run user-scope
 # cgroup, when systemd-run is available. Lightpanda has a known regression on
 # some JS-heavy pages (GitHub Copilot marketing, etc.) where RSS balloons to
@@ -180,7 +181,7 @@ def parse_lightpanda_usage(stderr: str) -> dict[str, Any] | None:
         if not line.startswith("$usage "):
             continue
         out: dict[str, Any] = {}
-        for kv in line[len("$usage "):].split():
+        for kv in line[len("$usage ") :].split():
             if "=" not in kv:
                 continue
             k, v = kv.split("=", 1)
@@ -219,6 +220,7 @@ def run_lightpanda_task(
     task_prompt: str,
     attachment: Path | None = None,
     timeout_s: float,
+    block_urls: list[str] | None = None,
 ) -> tuple[str, float, bool, str, int | None, list[dict[str, Any]], dict[str, Any] | None]:
     """Run a single task through lightpanda.
 
@@ -238,6 +240,9 @@ def run_lightpanda_task(
     cmd += ["--task", task_prompt]
     if attachment is not None:
         cmd += ["--attach", str(attachment)]
+    if block_urls:
+        # Lightpanda refuses these URLs and drops them from search results.
+        cmd += ["--block-urls", ",".join(block_urls)]
 
     cmd = _wrap_with_cgroup_cap(cmd)
 
@@ -377,6 +382,24 @@ def add_common_runner_args(parser: argparse.ArgumentParser, *, suite_name: str) 
         action="store_true",
         help="Skip task ids already present in <out-dir>/predictions.jsonl",
     )
+    add_block_answer_sources_arg(parser)
+
+
+def add_block_answer_sources_arg(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--block-answer-sources",
+        action="store_true",
+        help="Refuse pages that publish the benchmark's answers (Hugging Face "
+        "datasets and Spaces, benchmark mirrors, leaderboards; see "
+        "leaks.BLOCKED_URL_PATTERNS), in the browser and in search results",
+    )
+
+
+def answer_source_patterns(args: argparse.Namespace) -> list[str]:
+    """The URL patterns to block for this run; empty unless asked for."""
+    from .leaks import BLOCKED_URL_PATTERNS
+
+    return list(BLOCKED_URL_PATTERNS) if getattr(args, "block_answer_sources", False) else []
 
 
 def resolve_out_dir(out_dir_arg: Path | None, project_root: Path, suite_name: str) -> Path:
@@ -453,7 +476,7 @@ def _format_usage_summary(usage: dict[str, Any] | None) -> str:
 
     def _k(v: float | int) -> str:
         if v >= 1000:
-            return f"{v/1000:.1f}k"
+            return f"{v / 1000:.1f}k"
         return str(int(v))
 
     inp = usage.get("input_tokens", 0)

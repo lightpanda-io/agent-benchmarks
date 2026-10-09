@@ -45,6 +45,7 @@ from .._agent_browser import (
     run_agent_browser_task,
 )
 from ..common import (
+    answer_source_patterns,
     emit_scores,
     load_completed_ids,
     resolve_out_dir,
@@ -78,6 +79,7 @@ Rules for the final answer (the answer is graded verbatim, character-for-charact
 Strategy:
 - Prefer authoritative direct sources (Wikipedia, official sites, shipping carriers) over search-engine landing pages when you know where to go.
 - Small-candidate questions ("A, B, or C", yes/no): always pick one — never abstain.
+- Find the answer from primary sources. Don't look up this exact question or its answer in datasets, research papers, evaluation logs or other agents' outputs.
 - Be decisive: aim for ≤10 browser actions per task. If a tool fails repeatedly or the site is unreachable, commit to your best-effort answer from prior knowledge rather than continuing to retry.
 - Only respond "unknown" if you have exhausted browsing AND prior knowledge gives no lead.
 """
@@ -161,6 +163,7 @@ def main(argv: list[str] | None = None) -> int:
                 timeout_s=args.timeout,
                 engine=args.engine,
                 lightpanda=args.lightpanda,
+                block_urls=answer_source_patterns(args),
             )
         finally:
             pool.put(session)
