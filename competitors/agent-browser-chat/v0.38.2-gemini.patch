@@ -1,0 +1,246 @@
+diff --git a/cli/src/chat.rs b/cli/src/chat.rs
+index 0d68223..036baa2 100644
+--- a/cli/src/chat.rs
++++ b/cli/src/chat.rs
+@@ -222,23 +222,23 @@ async fn run_chat_turn(
+     let url = format!("{}/v1/chat/completions", gateway_url);
+     let client = chat::http_client();
+ 
+-    let total_deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(300);
++    let total_deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(std::env::var("AGENT_BROWSER_CHAT_TIMEOUT_S").ok().and_then(|v| v.parse::<u64>().ok()).unwrap_or(300));
+     let tool_timeout = std::time::Duration::from_secs(60);
+ 
+     let mut all_text = String::new();
+     let mut all_tool_calls: Vec<Value> = Vec::new();
+     let mut had_text = false;
+ 
+-    for _step in 0..50 {
++    for _step in 0..std::env::var("AGENT_BROWSER_CHAT_MAX_STEPS").ok().and_then(|v| v.parse::<usize>().ok()).unwrap_or(50) {
+         if tokio::time::Instant::now() >= total_deadline {
+             if json_mode {
+                 println!(
+                     "{}",
+-                    json!({"success": false, "error": "Chat session timed out (5 minute limit)."})
++                    json!({"success": false, "error": "Chat session timed out."})
+                 );
+             } else {
+                 eprintln!(
+-                    "\n{} Chat session timed out (5 minute limit).",
++                    "\n{} Chat session timed out.",
+                     color::error_indicator()
+                 );
+             }
+@@ -252,43 +252,72 @@ async fn run_chat_turn(
+             "stream": true,
+         });
+ 
+-        let gw_response = match client
+-            .post(&url)
+-            .header("Authorization", format!("Bearer {}", api_key))
+-            .header("Content-Type", "application/json")
+-            .body(gateway_body.to_string())
+-            .send()
+-            .await
+-        {
+-            Ok(r) => r,
+-            Err(e) => {
+-                if json_mode {
+-                    println!(
+-                        "{}",
+-                        json!({"success": false, "error": format!("Gateway request failed: {}", e)})
+-                    );
+-                } else {
+-                    eprintln!(
+-                        "\n{} Gateway request failed: {}",
+-                        color::error_indicator(),
+-                        e
+-                    );
++        // Retry rate limits (429) and transient upstream errors (5xx) within
++        // the session deadline, honouring the provider's suggested delay.
++        let mut attempt: u32 = 0;
++        let gw_response = loop {
++            let resp = match client
++                .post(&url)
++                .header("Authorization", format!("Bearer {}", api_key))
++                .header("Content-Type", "application/json")
++                .body(gateway_body.to_string())
++                .send()
++                .await
++            {
++                Ok(r) => r,
++                Err(e) => {
++                    if json_mode {
++                        println!(
++                            "{}",
++                            json!({"success": false, "error": format!("Gateway request failed: {}", e)})
++                        );
++                    } else {
++                        eprintln!(
++                            "\n{} Gateway request failed: {}",
++                            color::error_indicator(),
++                            e
++                        );
++                    }
++                    return false;
+                 }
+-                return false;
+-            }
+-        };
++            };
+ 
+-        if !gw_response.status().is_success() {
+-            let body_text = gw_response.text().await.unwrap_or_default();
++            let status = resp.status();
++            if status.is_success() {
++                break resp;
++            }
++            let retryable = status.as_u16() == 429 || status.is_server_error();
++            let header_hint = resp
++                .headers()
++                .get("retry-after")
++                .and_then(|v| v.to_str().ok())
++                .and_then(|v| v.trim().parse::<f64>().ok());
++            let body_text = resp.text().await.unwrap_or_default();
++            let delay_s = header_hint
++                .or_else(|| retry_hint_from_body(&body_text))
++                .unwrap_or_else(|| f64::from(2u32.pow(attempt.min(5))))
++                .clamp(1.0, 60.0);
++            let delay = std::time::Duration::from_secs_f64(delay_s);
++            attempt += 1;
++            if retryable
++                && attempt <= 20
++                && tokio::time::Instant::now() + delay < total_deadline
++            {
++                if !json_mode && verbosity != Verbosity::Quiet {
++                    eprintln!("{}", color::dim(&format!("retrying in {:.0}s after HTTP {}", delay_s, status)));
++                }
++                tokio::time::sleep(delay).await;
++                continue;
++            }
+             if json_mode {
+                 println!("{}", json!({"success": false, "error": body_text}));
+             } else {
+                 eprintln!("\n{} {}", color::error_indicator(), body_text);
+             }
+             return false;
+-        }
++        };
+ 
+-        let (text_chunks, tool_calls) =
++        let (text_chunks, tool_calls, tool_extras) =
+             parse_gateway_stream(gw_response, verbosity, json_mode).await;
+ 
+         if !text_chunks.is_empty() {
+@@ -319,10 +348,17 @@ async fn run_chat_turn(
+             break;
+         }
+ 
++        // Echo provider-specific `extra_content` (Gemini's OpenAI-compat
++        // endpoint puts the required thought_signature there) back verbatim.
+         let tc_values: Vec<Value> = tool_calls
+             .iter()
+-            .map(|(id, name, args)| {
+-                json!({"id": id, "type": "function", "function": {"name": name, "arguments": args}})
++            .zip(tool_extras.iter())
++            .map(|((id, name, args), extra)| {
++                let mut v = json!({"id": id, "type": "function", "function": {"name": name, "arguments": args}});
++                if let Some(extra) = extra {
++                    v["extra_content"] = extra.clone();
++                }
++                v
+             })
+             .collect();
+ 
+@@ -399,9 +435,16 @@ async fn parse_gateway_stream(
+     gw_response: reqwest::Response,
+     verbosity: Verbosity,
+     json_mode: bool,
+-) -> (Vec<String>, Vec<(String, String, String)>) {
++) -> (
++    Vec<String>,
++    Vec<(String, String, String)>,
++    Vec<Option<Value>>,
++) {
+     use futures_util::StreamExt as _;
+ 
++    let mut tool_call_extras: std::collections::HashMap<usize, Value> =
++        std::collections::HashMap::new();
++
+     let mut text_chunks: Vec<String> = Vec::new();
+     let mut tool_call_args: std::collections::HashMap<usize, (String, String, String)> =
+         std::collections::HashMap::new();
+@@ -427,12 +470,13 @@ async fn parse_gateway_stream(
+                 continue;
+             };
+             if data == "[DONE]" {
++                let extras = collect_tool_extras(&tool_call_args, &mut tool_call_extras);
+                 let tool_calls = collect_tool_calls(&mut tool_call_args);
+                 if !json_mode && !text_chunks.is_empty() {
+                     // End the streamed text line
+                     let _ = std::io::stdout().flush();
+                 }
+-                return (text_chunks, tool_calls);
++                return (text_chunks, tool_calls, extras);
+             }
+             let Ok(sse_json) = serde_json::from_str::<Value>(data) else {
+                 continue;
+@@ -456,6 +500,9 @@ async fn parse_gateway_stream(
+             if let Some(tcs) = delta.get("tool_calls").and_then(|t| t.as_array()) {
+                 for tc in tcs {
+                     let idx = tc.get("index").and_then(|i| i.as_u64()).unwrap_or(0) as usize;
++                    if let Some(extra) = tc.get("extra_content") {
++                        tool_call_extras.insert(idx, extra.clone());
++                    }
+                     if let std::collections::hash_map::Entry::Vacant(e) = tool_call_args.entry(idx)
+                     {
+                         let id = tc
+@@ -487,8 +534,26 @@ async fn parse_gateway_stream(
+     if !json_mode && !text_chunks.is_empty() {
+         let _ = std::io::stdout().flush();
+     }
++    let extras = collect_tool_extras(&tool_call_args, &mut tool_call_extras);
+     let tool_calls = collect_tool_calls(&mut tool_call_args);
+-    (text_chunks, tool_calls)
++    (text_chunks, tool_calls, extras)
++}
++
++/// Parses Google's "Please retry in 51.46s." hint out of an error body.
++fn retry_hint_from_body(body: &str) -> Option<f64> {
++    let rest = &body[body.find("retry in ")? + "retry in ".len()..];
++    let end = rest.find('s')?;
++    rest[..end].trim().parse::<f64>().ok()
++}
++
++/// Extras aligned with `collect_tool_calls`' index order.
++fn collect_tool_extras(
++    calls: &std::collections::HashMap<usize, (String, String, String)>,
++    extras: &mut std::collections::HashMap<usize, Value>,
++) -> Vec<Option<Value>> {
++    let mut indices: Vec<usize> = calls.keys().copied().collect();
++    indices.sort();
++    indices.into_iter().map(|i| extras.remove(&i)).collect()
+ }
+ 
+ fn collect_tool_calls(
+diff --git a/cli/src/native/stream/chat.rs b/cli/src/native/stream/chat.rs
+index 1eba517..f553074 100644
+--- a/cli/src/native/stream/chat.rs
++++ b/cli/src/native/stream/chat.rs
+@@ -895,14 +895,14 @@ pub(super) async fn handle_chat_request(
+         let _ = stream.write_all(ev.as_bytes()).await;
+     }
+ 
+-    let total_deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(300);
++    let total_deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(std::env::var("AGENT_BROWSER_CHAT_TIMEOUT_S").ok().and_then(|v| v.parse::<u64>().ok()).unwrap_or(300));
+     const TOOL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
+ 
+-    for _step in 0..50 {
++    for _step in 0..std::env::var("AGENT_BROWSER_CHAT_MAX_STEPS").ok().and_then(|v| v.parse::<usize>().ok()).unwrap_or(50) {
+         if tokio::time::Instant::now() >= total_deadline {
+             let ev = format!(
+                 "data: {}\n\n",
+-                json!({"type":"error","errorText":"Chat session timed out (5 minute limit)."})
++                json!({"type":"error","errorText":"Chat session timed out."})
+             );
+             let _ = stream.write_all(ev.as_bytes()).await;
+             break;
