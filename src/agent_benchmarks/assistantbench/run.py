@@ -130,6 +130,7 @@ def main(argv: list[str] | None = None) -> int:
         rows = rows[: args.limit]
 
     pending = [r for r in rows if r["id"] not in completed]
+    block_urls = answer_source_patterns(args, [r["id"] for r in rows])
 
     def _work(row: dict[str, Any]) -> dict[str, Any]:
         pred, duration_s, timed_out, stderr_tail, rc, trace, usage = run_lightpanda_task(
@@ -140,7 +141,7 @@ def main(argv: list[str] | None = None) -> int:
             system_prompt=SYSTEM_PROMPT,
             task_prompt=TASK_PROMPT_TEMPLATE.format(task=row["task"]),
             timeout_s=args.timeout,
-            block_urls=answer_source_patterns(args),
+            block_urls=block_urls,
         )
         pred, envelope_note = extract_answer_envelope(pred)
         if envelope_note:

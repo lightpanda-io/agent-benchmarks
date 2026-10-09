@@ -236,6 +236,7 @@ def main(argv: list[str] | None = None) -> int:
         rows = rows[: args.limit]
 
     pending = [r for r in rows if r["task_id"] not in completed]
+    block_urls = answer_source_patterns(args, [r["task_id"] for r in rows])
 
     def _work(row: dict[str, Any]) -> dict[str, Any]:
         attachment: Path | None = None
@@ -265,7 +266,7 @@ def main(argv: list[str] | None = None) -> int:
                 task_prompt=TASK_PROMPT_TEMPLATE.format(task=row["Question"]),
                 attachment=attachment,
                 timeout_s=args.timeout,
-                block_urls=answer_source_patterns(args),
+                block_urls=block_urls,
             )
             pred, envelope_note = extract_answer_envelope(raw_pred)
             if envelope_note:
