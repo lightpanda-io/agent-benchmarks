@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -78,6 +79,15 @@ BLOCKED_URL_PATTERNS = [
     "*paperswithcode.com/dataset*",
     "*metadata.jsonl*",
 ]
+
+
+def local_answer_paths() -> list[Path]:
+    """Local copies of the answers that a browser able to read files could
+    open: the Hugging Face cache (GAIA's metadata.parquet, AssistantBench's
+    Arrow files) and this repo's results, whose predictions carry `gold`."""
+    hf_home = Path(os.environ.get("HF_HOME") or Path.home() / ".cache" / "huggingface")
+    return [hf_home, Path(__file__).resolve().parents[2] / "results"]
+
 
 # Score a task must reach to count as correct, per suite.
 STRICT_THRESHOLD = {"gaia": 1.0, "assistantbench": 0.5}

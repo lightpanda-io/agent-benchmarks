@@ -32,6 +32,14 @@ One more change is in `cli/src/native/actions.rs`:
   Stock agent-browser only has an allow-list (`--allowed-domains`), which
   works per host and can't block just part of a site.
 
+`upload` and `diff snapshot --baseline` read any local file, and Gemini used
+`upload` to browse the local Hugging Face cache, where GAIA's
+`metadata.parquet` holds every answer. So with `--block-answer-sources` the
+runners start agent-browser under [bubblewrap](https://github.com/containers/bubblewrap)
+(`bwrap`, which must be installed), with the Hugging Face cache and
+`results/` mounted as empty tmpfs. The daemon and the browser it launches
+inherit that view.
+
 ## Build
 
 ```bash

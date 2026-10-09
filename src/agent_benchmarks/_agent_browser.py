@@ -122,6 +122,23 @@ def _strip_provider_prefix(model: str | None) -> str | None:
     return model
 
 
+def _hide_local_answers(cmd: list[str]) -> list[str]:
+    """Run `cmd` where the local copies of the answers look empty.
+
+    `upload` and `diff snapshot --baseline` read any local file, and the
+    model used them to browse the Hugging Face cache. The daemon and the
+    browser it spawns inherit the mount namespace, so neither sees them."""
+    from .leaks import local_answer_paths
+
+    if shutil.which("bwrap") is None:
+        raise RuntimeError("--block-answer-sources needs bubblewrap (bwrap) for agent-browser")
+    wrapped = ["bwrap", "--dev-bind", "/", "/"]
+    for path in local_answer_paths():
+        if path.exists():
+            wrapped += ["--tmpfs", str(path)]
+    return [*wrapped, "--", *cmd]
+
+
 def run_agent_browser_task(
     *,
     binary: str,
@@ -185,6 +202,7 @@ def run_agent_browser_task(
     # every page session (patched build, see competitors/agent-browser-chat).
     if block_urls:
         env["AGENT_BROWSER_BLOCKED_URLS"] = ",".join(block_urls)
+        cmd = _hide_local_answers(cmd)
 
     # Stock chat caps a run at 300s / 50 steps. Our patched build
     # (.ab-flash38/chat-budget.patch) reads these instead, so the chat loop
