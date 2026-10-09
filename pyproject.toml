@@ -39,6 +39,8 @@ gaia-grade = "agent_benchmarks.gaia.grade:main"
 gaia-ab-run = "agent_benchmarks.gaia.run_ab:main"
 # GAIA driven by Claude Code + a browser MCP server.
 gaia-mcp-run = "agent_benchmarks.gaia.run_mcp:main"
+# Flags tasks whose trace went to a copy of the benchmark's answers.
+leak-audit = "agent_benchmarks.leaks:main"
 webbench-run = "agent_benchmarks.webbench.run:main"
 webbench-grade = "agent_benchmarks.webbench.grade:main"
 

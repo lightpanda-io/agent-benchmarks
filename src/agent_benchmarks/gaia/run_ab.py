@@ -292,7 +292,7 @@ def main(argv: list[str] | None = None) -> int:
 
         session = pool.get()
         try:
-            pred, duration_s, timed_out, stderr_tail, rc = run_agent_browser_task(
+            pred, duration_s, timed_out, stderr_tail, rc, trace = run_agent_browser_task(
                 binary=binary,
                 session=session,
                 model=args.model,
@@ -315,7 +315,7 @@ def main(argv: list[str] | None = None) -> int:
             "level": row.get("Level"),
             "file_name": file_name or None,
             "attachment_status": attach_status,
-            "trace": [],
+            "trace": trace,
             "stderr_tail": stderr_tail,
         }
 

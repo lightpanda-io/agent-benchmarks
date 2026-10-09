@@ -153,7 +153,7 @@ def main(argv: list[str] | None = None) -> int:
         session = pool.get()
         try:
             message = TASK_PROMPT_TEMPLATE.format(instructions=SUITE_INSTRUCTIONS, task=row["task"])
-            pred, duration_s, timed_out, stderr_tail, rc = run_agent_browser_task(
+            pred, duration_s, timed_out, stderr_tail, rc, trace = run_agent_browser_task(
                 binary=binary,
                 session=session,
                 model=args.model,
@@ -173,9 +173,7 @@ def main(argv: list[str] | None = None) -> int:
             "timed_out": timed_out,
             "returncode": rc,
             "difficulty": row.get("difficulty"),
-            # agent-browser's chat doesn't emit the `[tool: ...]` Lightpanda
-            # format; trace stays empty so the JSONL envelope still matches.
-            "trace": [],
+            "trace": trace,
             "stderr_tail": stderr_tail,
         }
 
