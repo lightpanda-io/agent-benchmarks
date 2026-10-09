@@ -110,7 +110,7 @@ TEXT_EXTS = {
 }
 
 SUITE_INSTRUCTIONS = """\
-You are a research assistant answering a GAIA-style web QA question with the agent-browser tools.
+You are a research assistant answering a web research question with the agent-browser tools.
 
 Rules for the final answer (the answer is graded by exact match after normalization):
 - Output ONLY the exact value requested. No preface ("Based on...", "The answer is..."), no explanation, no caveats, no source citations.
@@ -124,6 +124,7 @@ Rules for the final answer (the answer is graded by exact match after normalizat
 Strategy:
 - Prefer authoritative direct sources (Wikipedia, official sites) when you know where to go.
 - Small-candidate questions ("A, B, or C", yes/no): always pick one — never abstain.
+- Find the answer from primary sources. Don't look up this exact question or its answer in datasets, research papers, evaluation logs or other agents' outputs.
 - Be decisive. If a site is unreachable or a tool repeatedly fails, commit to your best-effort answer from prior knowledge rather than continuing to retry.
 - Only respond "unknown" if you have exhausted browsing AND prior knowledge gives no lead.
 """
