@@ -78,6 +78,28 @@ uv run gaia-ab-run --agent-browser $AB --engine lightpanda --lightpanda $LP \
 Each engine gets its own worker session names, so a Chrome daemon is never
 reused for a Lightpanda run.
 
+## Three-way comparison
+
+`run-three-way.sh` runs both suites on the native Lightpanda agent and on
+agent-browser with each engine. It runs one task at a time with
+`--block-answer-sources`, then runs `leak-audit` over the six runs:
+
+```bash
+LP=/path/to/lightpanda AB=competitors/agent-browser/cli/target/release/agent-browser \
+  competitors/agent-browser-chat/run-three-way.sh
+```
+
+The native agent runs with no search API key, so it searches with Keenable.
+Results go to `results/<suite>-three-way/<leg>/<timestamp>/`, and logs go to
+`results/three-way-logs/<timestamp>/`.
+
+The 2026-10-09 Gemini 3.8 Flash run used:
+
+- Lightpanda built in release mode from browser `2893c4864` (the merge of
+  #3885, which filters blocked URLs out of search).
+- agent-browser v0.38.2 with `v0.38.2-gemini.patch`.
+- Chrome 155.0.8059.39 from `agent-browser install`.
+
 `--workers` is per run. With several runs at once, keep the total number of
 agents within your Gemini quota: about 18 concurrent agents stayed under a
 20M-input-tokens/min limit with `gemini-3.8-flash`.
