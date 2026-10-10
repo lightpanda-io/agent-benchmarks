@@ -279,6 +279,7 @@ def main(argv: list[str] | None = None) -> int:
         rows = rows[: args.limit]
 
     pending = [r for r in rows if r["task_id"] not in completed]
+    block_urls = answer_source_patterns(args, [r["task_id"] for r in rows])
 
     pool = make_session_pool(args.workers, prefix=f"ab-bench-gaia-{args.engine}")
 
@@ -302,7 +303,7 @@ def main(argv: list[str] | None = None) -> int:
                 timeout_s=args.timeout,
                 engine=args.engine,
                 lightpanda=args.lightpanda,
-                block_urls=answer_source_patterns(args),
+                block_urls=block_urls,
             )
         finally:
             pool.put(session)

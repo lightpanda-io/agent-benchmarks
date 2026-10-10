@@ -395,11 +395,17 @@ def add_block_answer_sources_arg(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def answer_source_patterns(args: argparse.Namespace) -> list[str]:
-    """The URL patterns to block for this run; empty unless asked for."""
+def answer_source_patterns(args: argparse.Namespace, task_ids: Iterable[str] = ()) -> list[str]:
+    """The URL patterns to block for this run; empty unless asked for.
+
+    Each of the suite's `task_ids` is blocked anywhere in a URL: ids only
+    appear in copies of the benchmark, and searching for one, on a search
+    engine or GitHub, is a lookup."""
     from .leaks import BLOCKED_URL_PATTERNS
 
-    return list(BLOCKED_URL_PATTERNS) if getattr(args, "block_answer_sources", False) else []
+    if not getattr(args, "block_answer_sources", False):
+        return []
+    return list(BLOCKED_URL_PATTERNS) + [f"*{t}*" for t in task_ids]
 
 
 def resolve_out_dir(out_dir_arg: Path | None, project_root: Path, suite_name: str) -> Path:

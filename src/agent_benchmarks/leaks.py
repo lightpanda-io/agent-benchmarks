@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -31,10 +32,11 @@ from typing import Any
 # Hosts and paths that publish benchmark questions with answers, or agent
 # logs of them. Extend as new mirrors turn up in traces.
 ANSWER_SOURCES = re.compile(
-    r"huggingface\.co/(datasets|spaces)/"
+    r"huggingface\.co/(api/)?(datasets|spaces)"
     r"|datasets-server\.huggingface\.co"
+    r"|\.hf\.space"
     r"|hf\.co/(datasets|spaces)/"
-    r"|harbor-datasets"
+    r"|harbor-datasets|harbor-framework"
     r"|evalscope"
     r"|leaderboard\."
     r"|paperswithcode"
@@ -50,13 +52,18 @@ ANSWER_SOURCES = re.compile(
 # anything. agent-browser's routes accept the same patterns. Narrower than
 # ANSWER_SOURCES where a broad match would block legitimate sources: all
 # of Hugging Face's datasets and Spaces go, but not its models or docs. A
-# search engine URL whose query names the benchmark is blocked too.
+# search engine URL whose query names the benchmark is blocked too. The
+# runners add one `*<task id>*` pattern per task of the suite on top.
 BLOCKED_URL_PATTERNS = [
     "*huggingface.co/datasets/*",
     "*huggingface.co/spaces/*",
     "*hf.co/datasets/*",
     "*hf.co/spaces/*",
     "*datasets-server.huggingface.co*",
+    "*huggingface.co/api/datasets*",
+    "*huggingface.co/api/spaces*",
+    # Spaces' own hosts: course Spaces serve GAIA questions and files.
+    "*.hf.space*",
     "*gaia-benchmark*",
     "*assistantbench*",
     # "GAIA benchmark" as typed, in a URL query, or URL-encoded; plain
@@ -66,11 +73,21 @@ BLOCKED_URL_PATTERNS = [
     "*gaia%20benchmark*",
     "*github*gaia*",
     "*harbor-datasets*",
+    "*harbor-framework*",
     "*evalscope*",
     "*leaderboard.neurometric*",
     "*paperswithcode.com/dataset*",
     "*metadata.jsonl*",
 ]
+
+
+def local_answer_paths() -> list[Path]:
+    """Local copies of the answers that a browser able to read files could
+    open: the Hugging Face cache (GAIA's metadata.parquet, AssistantBench's
+    Arrow files) and this repo's results, whose predictions carry `gold`."""
+    hf_home = Path(os.environ.get("HF_HOME") or Path.home() / ".cache" / "huggingface")
+    return [hf_home, Path(__file__).resolve().parents[2] / "results"]
+
 
 # Score a task must reach to count as correct, per suite.
 STRICT_THRESHOLD = {"gaia": 1.0, "assistantbench": 0.5}
