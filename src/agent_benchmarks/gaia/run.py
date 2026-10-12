@@ -129,7 +129,7 @@ BE PERSISTENT — this is the load-bearing instruction:
 
 Strategy:
 1. Plan: prefer authoritative direct sources (Wikipedia, official sites) over search-engine landing pages when you know where to go.
-2. Search: use the `search` tool — do NOT goto google.com directly. With `TAVILY_API_KEY` set, `search` queries Tavily and returns a clean numbered list of {title, url, snippet}; without the key, it falls back to scraping the DuckDuckGo HTML endpoint. Google scraping is blocked by Lightpanda's User-Agent and TLS fingerprint.
+2. Search: use the `search` tool — do NOT goto google.com directly. It returns a numbered list of {title, url, snippet}. Google scraping is blocked by Lightpanda's User-Agent and TLS fingerprint.
 3. Navigate the available browser tools. Re-inspect after page-changing actions — DOM snapshots and node ids go stale.
 4. Cross-check on a second source where the answer is non-obvious.
 
@@ -267,6 +267,7 @@ def main(argv: list[str] | None = None) -> int:
                 attachment=attachment,
                 timeout_s=args.timeout,
                 block_urls=block_urls,
+                search_engine=args.search_engine,
             )
             pred, envelope_note = extract_answer_envelope(raw_pred)
             if envelope_note:

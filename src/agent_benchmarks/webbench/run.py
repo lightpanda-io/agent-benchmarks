@@ -182,6 +182,7 @@ def main(argv: list[str] | None = None) -> int:
             provider=args.provider,
             model=args.model,
             user_agent=args.user_agent,
+            search_engine=args.search_engine,
             system_prompt=SYSTEM_PROMPT,
             task_prompt=TASK_PROMPT_TEMPLATE.format(start_url=row["start_url"], task=row["task"]),
             timeout_s=args.timeout,
