@@ -16,3 +16,6 @@ competitors/agent-browser/
 # vendor it — the Python package is pulled from PyPI via the pyproject.toml
 # dependency, and the MCP server runs via `python -m browser_use.mcp.server`.
 competitors/browser-use/
+# Checkout of github.com/browser-use/benchmark: the BU Bench tasks and judge.
+.bu-bench/
+.bubench-bin/

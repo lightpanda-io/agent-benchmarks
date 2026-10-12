@@ -216,11 +216,14 @@ def run_lightpanda_task(
     provider: str,
     model: str | None,
     user_agent: str | None,
-    system_prompt: str,
+    system_prompt: str | None,
     task_prompt: str,
     attachment: Path | None = None,
     timeout_s: float,
     block_urls: list[str] | None = None,
+    search_engine: str | None = None,
+    trace_path: Path | None = None,
+    drop_env: Iterable[str] = (),
 ) -> tuple[str, float, bool, str, int | None, list[dict[str, Any]], dict[str, Any] | None]:
     """Run a single task through lightpanda.
 
@@ -236,17 +239,23 @@ def run_lightpanda_task(
         cmd += ["--model", model]
     if user_agent:
         cmd += ["--user-agent", user_agent]
-    cmd += ["--system-prompt", system_prompt]
+    if system_prompt is not None:
+        cmd += ["--system-prompt", system_prompt]
     cmd += ["--task", task_prompt]
     if attachment is not None:
         cmd += ["--attach", str(attachment)]
     if block_urls:
         # Lightpanda refuses these URLs and drops them from search results.
         cmd += ["--block-urls", ",".join(block_urls)]
+    if search_engine:
+        cmd += ["--search-engine", search_engine]
+    if trace_path is not None:
+        cmd += ["--trace", str(trace_path), "--trace-results"]
 
     cmd = _wrap_with_cgroup_cap(cmd)
 
-    env = dict(os.environ)
+    dropped = set(drop_env)
+    env = {k: v for k, v in os.environ.items() if k not in dropped}
 
     started = time.monotonic()
     timed_out = False
@@ -370,6 +379,13 @@ def add_common_runner_args(parser: argparse.ArgumentParser, *, suite_name: str) 
         default=None,
         help="Override the browser User-Agent (forwarded to lightpanda --user-agent). "
         'Cannot contain "Mozilla" per Lightpanda\'s policy.',
+    )
+    parser.add_argument(
+        "--search-engine",
+        default=None,
+        choices=["auto", "brave", "tavily", "exa", "keenable"],
+        help="Pin the agent's `search` engine (default: Lightpanda's cascade, which "
+        "picks the first engine whose API key is set)",
     )
     parser.add_argument(
         "--out-dir",

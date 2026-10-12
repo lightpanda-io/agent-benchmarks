@@ -2,11 +2,15 @@
 Flag tasks where the agent went looking for the benchmark's own answers.
 
 Some models check an answer by searching the question verbatim, find a copy
-of GAIA or AssistantBench (Hugging Face datasets and Spaces, GitHub mirrors,
+of GAIA, AssistantBench or BU Bench (Hugging Face datasets and Spaces, GitHub mirrors,
 eval leaderboards, published agent logs) and read the gold answer from it.
 This scans each task's trace for tool calls whose arguments point at such a
 source, or contain one of the suite's task ids, and reports strict accuracy with those tasks
 counted as wrong.
+
+A search that repeats a long run of the question word for word is flagged
+too: it can only find copies of the question, such as a shared Perplexity
+thread that already answers it, not the facts the task asks to look up.
 
 Only the agent's own actions are matched (search queries, URLs it opened or
 fetched, scripts it ran), not tool outputs: a search result that merely
@@ -43,7 +47,10 @@ ANSWER_SOURCES = re.compile(
     r"|Who_and_When"
     r"|GAIA-modified|gaia_subset|gaia-benchmark|gaia( |\+|%20)benchmark"
     r"|metadata\.jsonl"
-    r"|assistantbench",
+    r"|assistantbench"
+    r"|browse_?comp"
+    r"|bu_bench|browser-use/benchmark"
+    r"|perplexity\.ai/search/",
     re.IGNORECASE,
 )
 
@@ -78,7 +85,31 @@ BLOCKED_URL_PATTERNS = [
     "*leaderboard.neurometric*",
     "*paperswithcode.com/dataset*",
     "*metadata.jsonl*",
+    # BU Bench: its BrowseComp subset publishes answers in OpenAI's
+    # simple-evals CSV and its mirrors; the task set ships in the repo.
+    "*browsecomp*",
+    "*browse_comp*",
+    "*browser-use/benchmark*",
+    "*bu_bench*",
+    # Shared Perplexity threads: other people's runs of the same questions.
+    "*perplexity.ai/search/*",
 ]
+
+# Consecutive question words a search query must repeat to be flagged. In
+# the GAIA, AssistantBench and BU Bench runs, every query at 14 or more was
+# the question itself; below that, titles and BrowseComp clues appear.
+QUESTION_ECHO_WORDS = 14
+
+_WORD = re.compile(r"\w+")
+
+
+def echoes_question(query: str, question: str) -> bool:
+    """Whether `query` repeats QUESTION_ECHO_WORDS consecutive words of
+    `question`, ignoring case and punctuation."""
+    q, t = _WORD.findall(query.lower()), _WORD.findall(question.lower())
+    n = QUESTION_ECHO_WORDS
+    runs = {tuple(t[i : i + n]) for i in range(len(t) - n + 1)}
+    return any(tuple(q[i : i + n]) in runs for i in range(len(q) - n + 1))
 
 
 def local_answer_paths() -> list[Path]:
@@ -93,16 +124,25 @@ def local_answer_paths() -> list[Path]:
 STRICT_THRESHOLD = {"gaia": 1.0, "assistantbench": 0.5}
 
 
-def leak_hits(trace: list[dict[str, Any]], task_ids: set[str]) -> list[str]:
-    """The tool-call arguments in `trace` that point at an answer source.
+def leak_hits(
+    trace: list[dict[str, Any]], task_ids: set[str], question: str | None = None
+) -> list[str]:
+    """The tool-call arguments in `trace` that point at an answer source, or
+    search for `question` itself.
 
     `task_ids` are the suite's own ids (GAIA UUIDs, AssistantBench hashes).
     They only appear in mirrors of the benchmark, so searching for one is a
     lookup. A generic UUID pattern would also catch ordinary site URLs."""
     hits = []
     for call in trace or []:
-        args = json.dumps(call.get("args"), ensure_ascii=False)
-        if ANSWER_SOURCES.search(args) or any(t in args for t in task_ids):
+        raw = call.get("args")
+        args = json.dumps(raw, ensure_ascii=False)
+        query = raw.get("query") if call.get("tool") == "search" and isinstance(raw, dict) else None
+        if (
+            ANSWER_SOURCES.search(args)
+            or any(t in args for t in task_ids)
+            or (question and isinstance(query, str) and echoes_question(query, question))
+        ):
             hits.append(f"{call.get('tool')}: {args[:200]}")
     return hits
 
@@ -123,7 +163,7 @@ def audit(predictions_path: Path) -> dict[str, Any]:
     flagged = []
     for r in rows:
         ok = score_by_id.get(r["id"], 0.0) >= threshold
-        hits = leak_hits(r.get("trace") or [], task_ids)
+        hits = leak_hits(r.get("trace") or [], task_ids, r.get("task"))
         correct += ok
         if hits:
             flagged.append({"id": r["id"], "correct": ok, "hits": hits[:5]})

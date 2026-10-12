@@ -24,6 +24,12 @@ own runner, grader, and README.
   FILE_MANIPULATION categories are out of scope (need real account auth
   on every site, side effects unverifiable from text snapshots).
 
+- [`bubench`](src/agent_benchmarks/bubench/README.md) —
+  [BU Bench V1](https://github.com/browser-use/benchmark): 100 tasks, 20
+  each from InteractionTests, WebBench READ, Online-Mind2Web 2, GAIA and
+  BrowseComp. Tasks, order and the judge come from a checkout of the
+  upstream repo, so scores compare with browser-use's published table.
+
 ## Current results
 
 Lightpanda native agent via zenai (built-in agent loop, prompt-cached,

@@ -20,6 +20,8 @@ dependencies = [
     # minor — the MCP server's tool surface (browser_navigate, browser_click,
     # ...) is stable inside 0.12.x.
     "browser-use>=0.12,<0.13",
+    # Decrypts the BU Bench task set (upstream's Fernet scheme).
+    "cryptography",
 ]
 
 [project.scripts]
@@ -32,6 +34,9 @@ assistantbench-ab-run = "agent_benchmarks.assistantbench.run_ab:main"
 # (--backend lightpanda or --backend agent-browser). Same predictions
 # envelope, same grader.
 assistantbench-mcp-run = "agent_benchmarks.assistantbench.run_mcp:main"
+bubench-run = "agent_benchmarks.bubench.run:main"
+# Re-judges a bubench predictions.jsonl with upstream's judge.
+bubench-grade = "agent_benchmarks.bubench.grade:main"
 gaia-run = "agent_benchmarks.gaia.run:main"
 gaia-grade = "agent_benchmarks.gaia.grade:main"
 # Alternate GAIA runner backed by Vercel agent-browser. Writes the same
