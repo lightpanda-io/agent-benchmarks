@@ -34,6 +34,26 @@ category in turn; `--category` picks categories.
 - `search` runs on Keenable's keyless endpoint: the runner removes the
   Brave, Tavily, Exa and Keenable keys from the agent's environment.
 
+## Browser Use control
+
+To compare against Browser Use on Chromium with the same model, run
+upstream's own runner, then judge it again the way `bubench-grade` judges
+Lightpanda's runs:
+
+```bash
+cd .bu-bench && uv run python run_framework_eval.py --framework browser-use \
+    --browser local_headless --model gemini-3.8-flash --parallel 2 --task-timeout 1800
+cd .. && uv run bubench-control-grade .bu-bench/run_data/<run> \
+    --out-dir results/bubench-control/<run>
+```
+
+Upstream's judge sees the agent's screenshots; `bubench-control-grade`
+drops them and fits the steps to the 40,000-character window, so both
+browsers are scored on text alone. `scores.json` keeps upstream's own
+verdict next to each task. A model missing from upstream's `models.py`
+needs a one-line entry there. Its headless Chrome is not muted, so pages
+that autoplay can be heard.
+
 ## Caveats
 
 - The agent has no file upload, so the InteractionTests tasks that need one
