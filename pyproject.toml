@@ -37,6 +37,8 @@ assistantbench-mcp-run = "agent_benchmarks.assistantbench.run_mcp:main"
 bubench-run = "agent_benchmarks.bubench.run:main"
 # Re-judges a bubench predictions.jsonl with upstream's judge.
 bubench-grade = "agent_benchmarks.bubench.grade:main"
+# Re-judges an upstream Browser Use run without screenshots, as bubench-grade judges.
+bubench-control-grade = "agent_benchmarks.bubench.control:main"
 gaia-run = "agent_benchmarks.gaia.run:main"
 gaia-grade = "agent_benchmarks.gaia.grade:main"
 # Alternate GAIA runner backed by Vercel agent-browser. Writes the same
