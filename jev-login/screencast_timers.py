@@ -1,52 +1,42 @@
-"""Put the screencast on the real clock, then burn in a timer per pane.
+"""Put the screencast on the traced clock, then burn in a timer per pane.
 
   vhs screencast.tape && ./screencast.sh stop && uv run python screencast_timers.py
 
 VHS records a browser-hosted terminal, and what it shows can trail the real
-one by a frame or two. To keep the clocks exact, the video is retimed first,
-piecewise, through moments whose true times the panes' own `--trace` files
+one by a frame or two. To keep the clocks exact, the video is retimed
+piecewise through moments whose true times the panes' own `--trace` files
 give:
 
 - Enter: the left pane's spinner line, drawn the moment the REPL reads it;
 - Jev's result appearing: Enter + its traced `login` duration;
 - each chat tool call's line appearing, found by its green bullet: the k-th
   bullet on screen is the k-th tool call in the trace;
-- the chat pane's last burst of output: Enter + its traced turn.
+- the chat pane's last change: Enter + its traced turn.
 
-Each anchor lands within a frame of its traced time, and the script prints
-them side by side so that is checked, not assumed.
+The script prints each anchor's traced time beside where it appeared on
+screen, so the size of the correction is visible on every run.
 """
 
 import argparse
 import itertools
-import json
 import subprocess
-import tempfile
 from pathlib import Path
+
+from demo import load_trace, login_window
 
 HERE = Path(__file__).parent
 RESULTS = HERE / "results"
-WIDTH, HEIGHT = 1920, 1080
+WIDTH = 1920
 
-# Regions at the tape's 1080p and font size. Jev's JSON lands in the
-# first; the second is the chat pane below its prompt line.
-RESULT_BOX = (20, 385, 560, 240)  # x, y, w, h
-# Where the yellow spinner glyph sits on the line the REPL draws on Enter.
-# Completion hints shown while typing are grey, so yellow means Enter.
+# Regions (x, y, w, h) at the tape's 1080p and font size.
+RESULT_BOX = (20, 385, 560, 240)  # where Jev's JSON lands, below the prompt
+# The yellow spinner glyph on the line the REPL draws on Enter. Completion
+# hints shown while typing are grey, so yellow means Enter.
 SPINNER_BOX = (20, 385, 40, 30)
-CHAT_BOX = (965, 420, 940, 620)
+CHAT_BOX = (965, 420, 940, 620)  # the chat pane below its prompt
 # The column the chat pane's `● [tool: …]` bullets sit in, and nothing else does.
 BULLETS = (965, 420, 14, 620)
 SCALE = 4  # the chat box is compared downscaled: a cursor blink stays small
-
-
-def records(trace):
-    return [json.loads(line) for line in trace.read_text().splitlines() if line]
-
-
-def login_start(recs):
-    login = next(r for r in recs if r.get("name") == "login")
-    return login["t"] - login["ms"]
 
 
 def frames(video, box, scale=1, pix="gray"):
@@ -91,16 +81,15 @@ def result_time(video, fps):
     raise SystemExit("never saw Jev's result in the left pane")
 
 
-def chat_bursts(video, fps):
-    """Times at which the chat pane gained output: a line or more, not a cursor blink."""
-    bursts, prev = [], None
+def last_change(video, fps):
+    """When the chat pane last gained output: a line or more, not a cursor blink."""
+    last, prev = None, None
     for i, frame in enumerate(frames(video, CHAT_BOX, SCALE)):
-        if prev is not None:
-            changed = sum(1 for a, b in zip(frame, prev, strict=True) if abs(a - b) > 12)
-            if changed > 60:
-                bursts.append(i / fps)
+        if (prev is not None and frame != prev
+                and sum(1 for a, b in zip(frame, prev, strict=True) if abs(a - b) > 12) > 60):
+            last = i / fps
         prev = frame
-    return bursts
+    return last
 
 
 def bullet_times(video, count, fps):
@@ -126,7 +115,8 @@ def clock(start, seconds):
     return f"%{{eif\\:trunc({e})\\:d}}.%{{eif\\:trunc(mod({e}*100\\,100))\\:d\\:2}}s"
 
 
-def pane(x, start, seconds, colour, regular, medium):
+def pane(x, start, seconds, colour, fonts):
+    regular, medium = fonts
     return [
         f"drawtext=fontfile={regular}:text='time inside /login':fontsize=24:"
         f"fontcolor=#8a8a8a:x={x}:y=852",
@@ -137,46 +127,31 @@ def pane(x, start, seconds, colour, regular, medium):
     ]
 
 
-def retime(points, enter, v):
-    if v <= points[0][0]:
-        return v
-    for (v0, r0), (v1, r1) in itertools.pairwise(points):
-        if v <= v1:
-            return enter + r0 + (v - v0) * (r1 - r0) / (v1 - v0)
-    return enter + points[-1][1] + (v - points[-1][0])
-
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--video", default=RESULTS / "jev-login-race.mp4", type=Path)
     parser.add_argument("--out", default=RESULTS / "jev-login-race-timed.mp4", type=Path)
     args = parser.parse_args()
 
-    jev_recs = records(RESULTS / "screencast-jev.jsonl")
-    chat_recs = records(RESULTS / "screencast-chat.jsonl")
-    jev = (max(r["t"] for r in jev_recs) - login_start(jev_recs)) / 1000
-    chat_start = login_start(chat_recs)
-    chat = (max(r["t"] for r in chat_recs) - chat_start) / 1000
+    _, _, jev_ms = login_window(load_trace(RESULTS / "screencast-jev.jsonl"))
+    during, chat_start, chat_ms = login_window(load_trace(RESULTS / "screencast-chat.jsonl"))
+    jev, chat = jev_ms / 1000, chat_ms / 1000
+    tools = [r for r in during if r["type"] == "tool" and r["name"] != "login"]
 
-    tools = [r for r in chat_recs
-             if r["type"] == "tool" and r["name"] != "login" and r["t"] >= chat_start]
-
-    # Anchors: (video time, real time since Enter). The result fixes Enter.
+    # (name, video time, traced time since Enter)
     fps = frame_rate(args.video)
     enter = enter_time(args.video, fps)
-    v_res = result_time(args.video, fps)
-    anchors = [(enter, 0.0), (v_res, jev)]
+    anchors = [("Enter", enter, 0.0), ("Jev result", result_time(args.video, fps), jev)]
     for v, r in zip(bullet_times(args.video, len(tools), fps), tools, strict=True):
-        anchors.append((v, (r["t"] - chat_start) / 1000))
-    anchors.append((chat_bursts(args.video, fps)[-1], chat))
+        anchors.append((r["name"], v, (r["t"] - chat_start) / 1000))
+    anchors.append(("chat turn ends", last_change(args.video, fps), chat))
     # Same-moment calls share a frame; keep the mapping strictly increasing.
-    points = [anchors[0]]
-    for v, r in anchors[1:]:
+    points, kept = [anchors[0][1:]], {0}
+    for i, (_, v, r) in enumerate(anchors[1:], 1):
         if v > points[-1][0] and r > points[-1][1]:
             points.append((v, r))
+            kept.add(i)
 
-    # Piecewise linear: on time before the result, through each anchor, then
-    # on time again after the last one.
     v_last, r_last = points[-1]
     remap = f"{enter + r_last:.3f}+(T-{v_last:.3f})"
     for (v0, r0), (v1, r1) in reversed(list(itertools.pairwise(points))):
@@ -184,27 +159,21 @@ def main():
         remap = f"if(lte(T\\,{v1:.3f})\\,{seg}\\,{remap})"
     remap = f"if(lte(T\\,{enter:.3f})\\,T\\,{remap})"
 
-    regular, medium = font("Regular"), font("Medium")
+    fonts = font("Regular"), font("Medium")
     filters = ([f"setpts='{remap}/TB'", f"fps={fps:g}"]
-               + pane(40, enter, jev, "#6cc7e2", regular, medium)
-               + pane(WIDTH // 2 + 20, enter, chat, "#b4afb6", regular, medium))
-    with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as script:
-        script.write(",\n".join(filters))
+               + pane(40, enter, jev, "#6cc7e2", fonts)
+               + pane(WIDTH // 2 + 20, enter, chat, "#b4afb6", fonts))
     subprocess.run(
-        ["ffmpeg", "-v", "error", "-y", "-i", str(args.video), "-/vf", script.name,
+        ["ffmpeg", "-v", "error", "-y", "-i", str(args.video), "-vf", ",".join(filters),
          "-c:v", "libx264", "-crf", "18", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
          str(args.out)],
         check=True)
-    Path(script.name).unlink()
 
     print(f"enter at {enter:.2f}s · Jev {jev:.2f}s · chat {chat:.2f}s")
-    print(f"on screen the chat turn took {anchors[-1][0] - enter:.2f}s; "
-          f"retimed through {len(points)} anchors")
-    print("anchor            traced   video before → after")
-    names = ["Enter", "Jev result"] + [r["name"] for r in tools] + ["chat turn ends"]
-    for name, (v, r) in zip(names, anchors, strict=True):
-        after = retime(points, enter, v) - enter
-        print(f"  {name:<17} {r:6.2f}s   {v - enter:6.2f}s → {after:6.2f}s")
+    print("anchor            traced   on screen")
+    for i, (name, v, r) in enumerate(anchors):
+        note = "" if i in kept else "   (shares a frame with the one before)"
+        print(f"  {name:<17} {r:6.2f}s   {v - enter:6.2f}s{note}")
     print(f"→ {args.out}")
 
 

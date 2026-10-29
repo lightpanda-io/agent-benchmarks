@@ -18,6 +18,7 @@ uv run python jev-login/demo.py --site hn    # live HN, decide-only
 | `--live` | off | on `--site hn`, really sign in instead of deciding only |
 | `--repeats` | `1` | runs per arm |
 | `--provider` / `--model` | `anthropic` / `claude-haiku-5-5` | the chat arm |
+| `--base-url` | none | an OpenAI-compatible endpoint, with `--provider openai` |
 | `--timeout` | `300` | seconds per run |
 
 The Jev arm needs `TYPESAFE_API_KEY` and the chat arm needs a key for its
@@ -26,25 +27,43 @@ reads `$LP_HN_USERNAME` and `$LP_HN_PASSWORD` and passes them as `$LP_*`
 placeholders, which resolve inside the browser, so the secrets stay out of the
 model's context and the result text.
 
+Any OpenAI-compatible endpoint works as the chat arm. For Groq:
+
+```console
+OPENAI_API_KEY=$GROQ_API_KEY uv run python jev-login/demo.py --provider openai \
+  --base-url https://api.groq.com/openai/v1 --model openai/gpt-oss-120b
+```
+
+Groq's free tier allows 8k tokens per minute, less than the chat arm's first
+request. On the paid tier the limit is 250k, which back-to-back repeats still
+exhaust; run them one at a time with a pause between.
+
 ## Measured
 
-Five runs per chat model on 2026-10-27, on one laptop, with lightpanda
-`3108ce691` (the `jev-fallback` branch). Jev and the replay ran alongside
-every chat model, so they have fifteen runs each. Every run signed in.
+Runs on 2026-10-28, on one laptop, with lightpanda `3108ce691` (the
+`jev-fallback` branch). Jev and the replay ran alongside every chat model run,
+so they have 35 runs each. Medians and ranges are over the runs that signed
+in.
 
-| arm | median | range | round trips | per round trip |
-| --- | --- | --- | --- | --- |
-| jev | 0.52s | 0.49–0.76s | 2 Jev calls | |
-| claude-haiku-5-5 | 8.2s | 7.5–9.7s | 5 | 1.6s |
-| gemini-3.5-flash-lite | 8.9s | 8.6–11.9s | 7–10 | 1.0s |
-| gemini-3.8-flash | 19.1s | 17.9–24.7s | 8–11 | 2.1s |
-| replay | 0.006s | 0.004–0.010s | none | |
+| arm | signed in | median | range | round trips | per round trip |
+| --- | --- | --- | --- | --- | --- |
+| jev | 35/35 | 0.36s | 0.32–0.58s | 2 Jev calls | |
+| claude-haiku-5-5 | 5/5 | 6.3s | 5.9–6.9s | 5 | 1.3s |
+| gpt-oss-120b (Groq) | 8/10 | 7.1s | 5.3–9.3s | 9–16 | 0.7s |
+| gemini-3.5-flash-lite | 5/5 | 10.4s | 8.8–15.5s | 7–12 | 1.1s |
+| gemini-3.8-flash | 5/5 | 21.7s | 18.7–27.8s | 7–11 | 2.7s |
+| gpt-oss-20b (Groq) | 0/10 | | | 2–6 | |
+| replay | 35/35 | 0.005s | up to 0.02s | none | |
 
-Jev is 16x faster than Haiku, the fastest chat model, on the median. Its
-slowest run was 10x faster than Haiku's fastest. Flash-lite has the quickest
-round trips but needs more of them; Haiku batches its tool calls (all three
-`nodeDetails` in one turn, both `fill`s in the next) and always finishes in
-five.
+Jev is 17x faster than Haiku, the fastest chat model, on the median. Haiku
+batches its tool calls (all three `nodeDetails` in one turn, both `fill`s in
+the next) and always finishes in five. gpt-oss-120b on Groq has the quickest
+round trips but makes two to three times as many, so it lands just behind
+Haiku. Its two failures were its own: one run filled the username and
+submitted without the password, the other filled both and stopped. gpt-oss-20b
+never signed in. It kept calling `tree` with a `url` it made up
+(`about:blank`, `https://example.com/login`), which navigated away from the
+login page.
 
 Effort stays at the REPL default, `low`. That is the floor for
 gemini-3.8-flash: it answers `minimal` with HTTP 400, and `none` sends no
@@ -73,7 +92,9 @@ doesn't spend turns on `getEnv` or on tools that will fail.
 `tool calls` counts browser work inside the command. The Jev and replay arms
 show 1 because `login` is itself the tool.
 
-`✓` means the run left the login page. The Jev and replay arms also report
+`✓` means the run ended on the same site as the login page, at another URL,
+under another title. Leaving the login page is not enough: gpt-oss-20b
+navigates to URLs it invents. The Jev and replay arms also report
 `"loggedIn": true` from their own verification re-read.
 
 ## Screencast
@@ -108,10 +129,11 @@ types nothing, so it is safe to repeat. `--site hn --live` signs in for real,
 three times per repeat (once per arm). Use it to check the real page end to
 end, and don't loop it to collect a median.
 
-The chat arm's time goes on round trips. Haiku's five turns take 1.2 to 2.3
-seconds each and write about 600 output tokens in total. Moving from
-gemini-3.8-flash to Haiku cut the chat arm by more than half, and Jev is still
-16x faster, because every chat model pays a round trip per turn.
+The chat arm's time goes on round trips. Haiku's five turns take about 1.3
+seconds each and write about 600 output tokens in total. Faster inference
+shortens each turn without removing any: Groq's gpt-oss-120b turns take 0.7s,
+and with three times as many of them it still lands behind Haiku. Jev makes
+two calls.
 
 Haiku reads almost all of its input from Anthropic's prompt cache (74k of 75k
 tokens in a typical run). The Gemini runs mostly don't hit a cache. Caching
