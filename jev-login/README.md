@@ -20,6 +20,7 @@ uv run python jev-login/demo.py --site hn    # live HN, decide-only
 | `--provider` / `--model` | `anthropic` / `claude-haiku-5-5` | the chat arm |
 | `--base-url` | none | an OpenAI-compatible endpoint, with `--provider openai` |
 | `--timeout` | `300` | seconds per run |
+| `--jev-label` | `jev` | the Jev arm's name, for a [local decider](#local-decider) |
 
 The Jev arm needs `TYPESAFE_API_KEY` and the chat arm needs a key for its
 provider. The fixture supplies its own throwaway credentials. `--site hn`
@@ -74,6 +75,65 @@ Its `submitSelector` comes back as
 `form:has(input[type="submit"][value="login"]) > input`. HN serves a sign-in
 form and a create-account form with identically named inputs, and telling them
 apart is the hard part of this page.
+
+## Local decider
+
+[StartLux-Decision](https://huggingface.co/startlux-models) ships GGUF builds
+plus a small Python server (`startlux_decision.gguf_server`) that answers
+System One requests from llama-server's next-token log-probabilities. It
+accepts the same `state`/`questions` and returns the same answer shapes as Jev,
+and `TYPESAFE_BASE_URL` points the browser at it, so no browser change is
+needed. The weights are CC BY-NC 4.0.
+
+On the GPU machine (llama.cpp ≥ b10454):
+
+```console
+hf download startlux-models/StartLux-Decision-v1-2B-Q8_0-GGUF --local-dir 2b
+uv venv && uv pip install transformers torch   # tokenizer only, no torch model is loaded
+llama-server -m 2b/StartLux-Decision-2B-Q8_0.gguf -ngl 99 -c 20480 --parallel 1 --ctx-checkpoints 0 -b 16384 -ub 16384 --port 8081
+cd 2b && python -m startlux_decision.gguf_server --model-dir . --llama http://127.0.0.1:8081 --port 8090
+```
+
+The decision server binds 127.0.0.1, so tunnel to it, then run the demo with
+any non-empty key:
+
+```console
+ssh -N -L 8090:127.0.0.1:8090 gpu-host
+TYPESAFE_BASE_URL=http://127.0.0.1:8090 TYPESAFE_API_KEY=local \
+  uv run python jev-login/demo.py --jev-label startlux-2b --repeats 5
+```
+
+Measured 2026-11-11 on a Quadro RTX 5000 (16 GB, Turing), reached over Wi-Fi
+through an SSH tunnel; 5 fixture runs per model, hosted Jev rerun the same day:
+
+| decider | signed in | median | range | server compute |
+| --- | --- | --- | --- | --- |
+| jev (hosted) | 5/5 | 0.51s | 0.49–0.57s | |
+| startlux-2b Q8_0 | 5/5 | 0.58s | 0.49–0.71s | ~0.40s |
+| startlux-v1.1-2b-instant Q8_0 | 5/5 | 0.66s | 0.48–0.77s | ~0.40s |
+| startlux-4b Q4_K_M | 5/5 | 1.35s | 1.10–1.43s | ~0.87s |
+| startlux-9b Q8_0 | 5/5 | 2.40s | 1.60–3.63s | ~1.35s |
+
+Both models make the same 2 calls as Jev: four questions in parallel, then the
+check. On live HN (decide-only) the 2B and the 4B return the same
+`submitSelector` as Jev, in 0.82s and 1.19s. The v1.1 2B Instant does not:
+in 7 of 7 runs it takes the username field from the create-account form
+(`form:has(input[name="creating"]...) input[name="acct"]`) and the password
+and submit from the sign-in form, so a live login would fail. Decide-only
+marks ✓ whenever both selectors come back, so check the selectors themselves.
+The Instant model needs the `startlux-decide` package
+([StartLuxLabs/StartLux-Decision](https://github.com/StartLuxLabs/StartLux-Decision),
+plus `jinja2`, which it does not declare) and one llama-server slot
+(`--parallel 1 --ctx-checkpoints 0 -b 16384 -ub 16384`,
+`STARTLUX_LLAMACPP_BIDIR=server`), since it reads prompts bidirectionally.
+
+The server time is GPU compute, not llama-server tuning. Timed on the GPU host
+with a 4-question, 2,532-token request (20 runs each), the v1 2B took 531 ms
+with one slot and a 16k batch, 595 ms with four slots at the default batch,
+and 597–609 ms with four slots and a 4k batch or with flash attention: about
+4,500 tokens/s in every case. The 4B and 9B are slower in proportion to their
+size, so only a faster GPU closes the gap to hosted Jev. The rest of the
+spread is the Wi-Fi link (the 9B's is mostly that).
 
 ## Reading the output
 

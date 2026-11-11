@@ -163,8 +163,11 @@ def main():
     parser.add_argument("--model", default="claude-haiku-5-5")
     parser.add_argument("--base-url", help="an OpenAI-compatible endpoint, with --provider openai")
     parser.add_argument("--timeout", type=int, default=300)
+    parser.add_argument("--jev-label", default="jev",
+                        help="name for the Jev arm, e.g. startlux-4b when TYPESAFE_BASE_URL points at a local decider")
     args = parser.parse_args()
     c = colours(sys.stdout)
+    LABELS["jev"] = args.jev_label
 
     if not BIN.exists():
         raise SystemExit(f"no binary at {BIN}; run `make build-dev` in browser/")
@@ -190,7 +193,7 @@ def main():
     print(f"\n{c['bold']}{c['cyan']}  lightpanda /login  ·  one structured decision "
           f"vs one chat conversation{c['reset']}")
     print(f"{c['dim']}  page     {site['url']}{c['reset']}")
-    print(f"{c['dim']}  deciders TypeSafe Jev · {args.model} · recorded selectors "
+    print(f"{c['dim']}  deciders {decider_name(args.jev_label)} · {args.model} · recorded selectors "
           f"(no model){c['reset']}")
     if decide_only:
         print(f"{c['dim']}  mode     decide-only: nothing is typed or submitted{c['reset']}")
@@ -214,21 +217,29 @@ def main():
     summarise(runs, c)
 
 
+LABELS = {"jev": "jev", "chat": "chat", "replay": "replay"}
+
+
+def decider_name(label):
+    base = os.environ.get("TYPESAFE_BASE_URL")
+    return f"{label} at {base}" if base else "TypeSafe Jev"
+
+
 def report(row, c):
-    arm = row["arm"]
+    arm = LABELS[row["arm"]]
     if "error" in row:
-        print(f"    {c['cyan']}{arm:<7}{c['reset']} {c['red']}✗{c['reset']} {row['error']}")
+        print(f"    {c['cyan']}{arm:<11}{c['reset']} {c['red']}✗{c['reset']} {row['error']}")
         return row
     secs = row["ms"] / 1000
     mark = f"{c['green']}✓{c['reset']}" if row["ok"] else f"{c['red']}✗{c['reset']}"
     if row["model_calls"]:
         decider = count(row["model_calls"], "chat call")
     elif calls := row["outcome"].get("calls"):
-        decider = count(calls, "jev call")
+        decider = count(calls, "decision call")
     else:
         decider = "no model call"
-    print(f"    {c['cyan']}{arm:<7}{c['reset']} {bar(secs)} {secs:6.2f}s  "
-          f"{decider:<14} {count(row['tool_calls'], 'tool call'):<13} {mark}")
+    print(f"    {c['cyan']}{arm:<11}{c['reset']} {bar(secs)} {secs:6.2f}s  "
+          f"{decider:<16} {count(row['tool_calls'], 'tool call'):<13} {mark}")
     return row
 
 
@@ -237,7 +248,7 @@ def summarise(runs, c):
              if (ms := [r["ms"] for r in rows if r.get("ok")])}
     tokens = sum(r.get("tokens", 0) for r in runs["chat"])
     print(f"\n{c['dim']}  {'─' * 74}{c['reset']}")
-    line = "  ".join(f"{c['bold']}{arm}{c['reset']} {ms / 1000:.2f}s" for arm, ms in times.items())
+    line = "  ".join(f"{c['bold']}{LABELS[arm]}{c['reset']} {ms / 1000:.2f}s" for arm, ms in times.items())
     print(f"  {c['bold']}median{c['reset']}   {line}")
     if "jev" in times and "chat" in times:
         print(f"           {c['yellow']}{times['chat'] / times['jev']:.0f}x{c['reset']} faster "
