@@ -194,6 +194,17 @@ The output is `results/jev-login-local-race-timed.mp4`. With less height per
 REPL, the clocks sit beside each pane's banner instead of below the output.
 On the P53 take, StartLux-2B signed in after 0.46s and Haiku after 5.29s.
 
+`screencast_endcard.py` appends a 5-second card charting every decider's
+median from the [local decider](#local-decider) table, so the race is followed
+by the other sizes and by hosted Jev:
+
+```console
+uv run --with pillow python screencast_endcard.py
+```
+
+The numbers are typed into the script from that table, not measured by it.
+The output is `results/jev-login-local-race-card.mp4`.
+
 ## Caveats
 
 The default page is a local fixture of HN's login markup (`input[name=acct]`
