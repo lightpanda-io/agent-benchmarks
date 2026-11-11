@@ -60,7 +60,7 @@ right=$(t split-window -h -t "$top" -P -F '#{pane_id}' "$chat")
 gpu=$(t split-window -h -t "$strip" -P -F '#{pane_id}' "$btop")
 
 t select-pane -t "$top" -T "$MODEL · local llama.cpp" \; \
-  select-pane -t "$right" -T "Claude Haiku 5.5 (no TypeSafe key)" \; \
+  select-pane -t "$right" -T "Claude Haiku 5.5" \; \
   select-pane -t "$strip" -T "llama-server log" \; \
   select-pane -t "$gpu" -T "btop · GPU"
 # Typed keys go to both REPLs and to neither monitor.
