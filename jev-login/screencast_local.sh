@@ -38,12 +38,14 @@ for _ in $(seq 50); do
 done
 
 # btop with the GPU box only, from a copy of the user's config so theirs is
-# left alone; 100 ms updates so a sub-second decision shows up at all.
+# left alone; 100 ms updates so a sub-second decision shows up at all, and
+# the terminal's own background.
 BTOP_HOME=$(mktemp -d)
 mkdir -p "$BTOP_HOME/btop"
-{ grep -vE '^(shown_boxes|update_ms) ' "$HOME/.config/btop/btop.conf" 2>/dev/null || true
+{ grep -vE '^(shown_boxes|update_ms|theme_background) ' "$HOME/.config/btop/btop.conf" 2>/dev/null || true
   echo 'shown_boxes = "gpu0"'
-  echo 'update_ms = 100'; } > "$BTOP_HOME/btop/btop.conf"
+  echo 'update_ms = 100'
+  echo 'theme_background = false'; } > "$BTOP_HOME/btop/btop.conf"
 
 flags="--verbosity medium --log-level err --log-filter note --url $URL"
 mkdir -p "$HERE/results"
