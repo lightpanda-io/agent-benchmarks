@@ -192,7 +192,7 @@ vhs screencast_local.tape && ./screencast_local.sh stop && uv run python screenc
 
 The output is `results/jev-login-local-race-timed.mp4`. With less height per
 REPL, the clocks sit beside each pane's banner instead of below the output.
-On the P53 take, StartLux-2B signed in after 0.46s and Haiku after 5.29s.
+On the P53 take, StartLux-2B signed in after 0.48s and Haiku after 5.06s.
 
 `screencast_endcard.py` appends a 5-second card charting every decider's
 median from the [local decider](#local-decider) table, so the race is followed
