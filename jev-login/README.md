@@ -179,6 +179,21 @@ take. The clocks always show that take's own traced numbers. A long chat
 summary can reach the clock area at the bottom of the right pane; check the
 end of each take.
 
+`screencast_local.sh` and `screencast_local.tape` record the same race with a
+[local decider](#local-decider) on the left, on the machine that runs it.
+Below the two REPLs, a strip shows llama-server's log trimmed to one line per
+forward pass, and btop's GPU panel, so the decision is seen happening on the
+local GPU. Run it there with the decision server up and `ANTHROPIC_API_KEY`
+set:
+
+```console
+vhs screencast_local.tape && ./screencast_local.sh stop && uv run python screencast_timers.py --layout local
+```
+
+The output is `results/jev-login-local-race-timed.mp4`. With less height per
+REPL, the clocks sit beside each pane's banner instead of below the output.
+On the P53 take, StartLux-2B signed in after 0.46s and Haiku after 5.29s.
+
 ## Caveats
 
 The default page is a local fixture of HN's login markup (`input[name=acct]`
