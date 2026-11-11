@@ -24,7 +24,6 @@ LOCAL, HOSTED = "#6cc7e2", "#6b6b6b"
 ROWS = [
     ("Jev", 0.51, False, ""),
     ("StartLux 2B", 0.58, True, ""),
-    ("StartLux 2B Instant", 0.66, True, "wrong field on live HN"),
     ("StartLux 4B", 1.35, True, ""),
     ("StartLux 9B", 2.40, True, ""),
     ("Claude Haiku 5.5", 5.06, False, ""),
