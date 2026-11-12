@@ -20,9 +20,11 @@ uv run python jev-login/demo.py --site hn    # live HN, decide-only
 | `--provider` / `--model` | `anthropic` / `claude-haiku-5-5` | the chat arm |
 | `--base-url` | none | an OpenAI-compatible endpoint, with `--provider openai` |
 | `--timeout` | `300` | seconds per run |
+| `--jev-label` | `jev` | the Jev arm's name, for a [local decider](#local-decider) |
+| `--no-gemini` | off | skip the [`gemini-decision-1`](#gemini-decisions) arm |
 
-The Jev arm needs `TYPESAFE_API_KEY` and the chat arm needs a key for its
-provider. The fixture supplies its own throwaway credentials. `--site hn`
+The Jev arm needs `TYPESAFE_API_KEY`, the Gemini arm `GOOGLE_API_KEY` or
+`GEMINI_API_KEY`, and the chat arm a key for its provider. The fixture supplies its own throwaway credentials. `--site hn`
 reads `$LP_HN_USERNAME` and `$LP_HN_PASSWORD` and passes them as `$LP_*`
 placeholders, which resolve inside the browser, so the secrets stay out of the
 model's context and the result text.
@@ -75,6 +77,94 @@ Its `submitSelector` comes back as
 form and a create-account form with identically named inputs, and telling them
 apart is the hard part of this page.
 
+## Gemini decisions
+
+`gemini-decision-1` is Google's structured decision model, which zenai calls
+through the Gemini Developer API (not Vertex). It takes the same questions as
+Jev, so `/login` makes the same two calls with no other browser change.
+
+When both a Gemini key and `TYPESAFE_API_KEY` are set, the browser sends
+decisions to Gemini. `LIGHTPANDA_DECISION_PROVIDER` overrides that, so the demo
+sets it to `typesafe` for the Jev arm and to `gemini` for the Gemini arm. The
+chat and replay arms unset all three keys.
+
+Measured 2026-11-12, on one laptop, with a release build of lightpanda
+`16ff86bc7`; 5 fixture runs, all arms interleaved:
+
+| arm | signed in | median | range | round trips |
+| --- | --- | --- | --- | --- |
+| jev | 5/5 | 0.36s | 0.32–0.39s | 2 decision calls |
+| gemini-decision-1 | 5/5 | 0.74s | 0.64–0.76s | 2 decision calls |
+| claude-haiku-5-5 | 5/5 | 4.57s | 3.73–5.40s | 4–5 |
+| replay | 5/5 | 0.00s | up to 0.01s | none |
+
+Gemini takes about twice as long as Jev per decision and is about 6x faster
+than Haiku. Haiku finished in 4 turns in three of these runs, against 5 every
+time in October, which accounts for its lower median.
+
+On live HN (decide-only, 3 runs) Jev's median was 0.20s and Gemini's 0.46s,
+both with one decision call. The traced run's Gemini selectors match Jev's,
+submit included: `form:has(input[type="submit"][value="login"]) > input`.
+
+## Local decider
+
+[StartLux-Decision](https://huggingface.co/startlux-models) ships GGUF builds
+plus a small Python server (`startlux_decision.gguf_server`) that answers
+System One requests from llama-server's next-token log-probabilities. It
+accepts the same `state`/`questions` and returns the same answer shapes as Jev,
+and `TYPESAFE_BASE_URL` points the browser at it, so no browser change is
+needed. The weights are CC BY-NC 4.0.
+
+On the GPU machine (llama.cpp ≥ b10454):
+
+```console
+hf download startlux-models/StartLux-Decision-v1-2B-Q8_0-GGUF --local-dir 2b
+uv venv && uv pip install transformers torch   # tokenizer only, no torch model is loaded
+llama-server -m 2b/StartLux-Decision-2B-Q8_0.gguf -ngl 99 -c 20480 --parallel 1 --ctx-checkpoints 0 -b 16384 -ub 16384 --port 8081
+cd 2b && python -m startlux_decision.gguf_server --model-dir . --llama http://127.0.0.1:8081 --port 8090
+```
+
+The decision server binds 127.0.0.1, so tunnel to it, then run the demo with
+any non-empty key:
+
+```console
+ssh -N -L 8090:127.0.0.1:8090 gpu-host
+TYPESAFE_BASE_URL=http://127.0.0.1:8090 TYPESAFE_API_KEY=local \
+  uv run python jev-login/demo.py --jev-label startlux-2b --repeats 5
+```
+
+Measured 2026-11-11 on a Quadro RTX 5000 (16 GB, Turing), reached over Wi-Fi
+through an SSH tunnel; 5 fixture runs per model, hosted Jev rerun the same day:
+
+| decider | signed in | median | range | server compute |
+| --- | --- | --- | --- | --- |
+| jev (hosted) | 5/5 | 0.51s | 0.49–0.57s | |
+| startlux-2b Q8_0 | 5/5 | 0.58s | 0.49–0.71s | ~0.40s |
+| startlux-v1.1-2b-instant Q8_0 | 5/5 | 0.66s | 0.48–0.77s | ~0.40s |
+| startlux-4b Q4_K_M | 5/5 | 1.35s | 1.10–1.43s | ~0.87s |
+| startlux-9b Q8_0 | 5/5 | 2.40s | 1.60–3.63s | ~1.35s |
+
+Both models make the same 2 calls as Jev: four questions in parallel, then the
+check. On live HN (decide-only) the 2B and the 4B return the same
+`submitSelector` as Jev, in 0.82s and 1.19s. The v1.1 2B Instant does not:
+in 7 of 7 runs it takes the username field from the create-account form
+(`form:has(input[name="creating"]...) input[name="acct"]`) and the password
+and submit from the sign-in form, so a live login would fail. Decide-only
+marks ✓ whenever both selectors come back, so check the selectors themselves.
+The Instant model needs the `startlux-decide` package
+([StartLuxLabs/StartLux-Decision](https://github.com/StartLuxLabs/StartLux-Decision),
+plus `jinja2`, which it does not declare) and one llama-server slot
+(`--parallel 1 --ctx-checkpoints 0 -b 16384 -ub 16384`,
+`STARTLUX_LLAMACPP_BIDIR=server`), since it reads prompts bidirectionally.
+
+The server time is GPU compute, not llama-server tuning. Timed on the GPU host
+with a 4-question, 2,532-token request (20 runs each), the v1 2B took 531 ms
+with one slot and a 16k batch, 595 ms with four slots at the default batch,
+and 597–609 ms with four slots and a 4k batch or with flash attention: about
+4,500 tokens/s in every case. The 4B and 9B are slower in proportion to their
+size, so only a faster GPU closes the gap to hosted Jev. The rest of the
+spread is the Wi-Fi link (the 9B's is mostly that).
+
 ## Reading the output
 
 `time` runs from the moment `/login` starts to the last thing the run does,
@@ -118,6 +208,32 @@ Each take is a fresh live run, so the chat side's time changes from take to
 take. The clocks always show that take's own traced numbers. A long chat
 summary can reach the clock area at the bottom of the right pane; check the
 end of each take.
+
+`screencast_local.sh` and `screencast_local.tape` record the same race with a
+[local decider](#local-decider) on the left, on the machine that runs it.
+Below the two REPLs, a strip shows llama-server's log trimmed to one line per
+forward pass, and btop's GPU panel, so the decision is seen happening on the
+local GPU. Run it there with the decision server up and `ANTHROPIC_API_KEY`
+set:
+
+```console
+vhs screencast_local.tape && ./screencast_local.sh stop && uv run python screencast_timers.py --layout local
+```
+
+The output is `results/jev-login-local-race-timed.mp4`. With less height per
+REPL, the clocks sit beside each pane's banner instead of below the output.
+On the P53 take, StartLux-2B signed in after 0.48s and Haiku after 5.06s.
+
+`screencast_endcard.py` appends a 5-second card charting every decider's
+median from the [local decider](#local-decider) table, so the race is followed
+by the other sizes and by hosted Jev:
+
+```console
+uv run --with pillow python screencast_endcard.py
+```
+
+The numbers are typed into the script from that table, not measured by it.
+The output is `results/jev-login-local-race-card.mp4`.
 
 ## Caveats
 

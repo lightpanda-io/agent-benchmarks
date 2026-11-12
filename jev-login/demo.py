@@ -105,10 +105,14 @@ def run_one(arm, site, args, decide_only, selectors=()):
     slash command; the REPL reads piped stdin fine, which is the only way in.
     """
     env = dict(os.environ) | site["env"]
-    if arm != "jev":
+    # Gemini outranks TypeSafe when both keys are set, so pin each decision arm.
+    if arm in DECISION_PROVIDERS:
+        env["LIGHTPANDA_DECISION_PROVIDER"] = DECISION_PROVIDERS[arm]
+    else:
         # The chat fallback fires on a missing key, and without one the replay
         # provably asks nothing.
-        env.pop("TYPESAFE_API_KEY", None)
+        for var in ("TYPESAFE_API_KEY", "GOOGLE_API_KEY", "GEMINI_API_KEY"):
+            env.pop(var, None)
     chat = ["--provider", args.provider, "--model", args.model,
             *(["--base-url", args.base_url] if args.base_url else [])]
     decider = chat if arm == "chat" else ["--no-llm"]
@@ -163,8 +167,13 @@ def main():
     parser.add_argument("--model", default="claude-haiku-5-5")
     parser.add_argument("--base-url", help="an OpenAI-compatible endpoint, with --provider openai")
     parser.add_argument("--timeout", type=int, default=300)
+    parser.add_argument("--jev-label", default="jev",
+                        help="name for the Jev arm, e.g. startlux-4b when TYPESAFE_BASE_URL points at a local decider")
+    parser.add_argument("--no-gemini", dest="gemini", action="store_false",
+                        help="skip the gemini-decision-1 arm (needs GOOGLE_API_KEY or GEMINI_API_KEY)")
     args = parser.parse_args()
     c = colours(sys.stdout)
+    LABELS["jev"] = args.jev_label
 
     if not BIN.exists():
         raise SystemExit(f"no binary at {BIN}; run `make build-dev` in browser/")
@@ -190,17 +199,19 @@ def main():
     print(f"\n{c['bold']}{c['cyan']}  lightpanda /login  ·  one structured decision "
           f"vs one chat conversation{c['reset']}")
     print(f"{c['dim']}  page     {site['url']}{c['reset']}")
-    print(f"{c['dim']}  deciders TypeSafe Jev · {args.model} · recorded selectors "
+    print(f"{c['dim']}  deciders {decider_name(args.jev_label)} · {args.model} · recorded selectors "
           f"(no model){c['reset']}")
     if decide_only:
         print(f"{c['dim']}  mode     decide-only: nothing is typed or submitted{c['reset']}")
     print()
 
-    runs = {"jev": [], "chat": [], "replay": []}
+    runs = {"jev": [], "gemini": [], "chat": [], "replay": []}
     try:
         for _ in range(args.repeats):
             jev = run_one("jev", site, args, decide_only)
             runs["jev"].append(report(jev, c))
+            if args.gemini:
+                runs["gemini"].append(report(run_one("gemini", site, args, decide_only), c))
             if decide_only:
                 continue
             runs["chat"].append(report(run_one("chat", site, args, decide_only), c))
@@ -214,21 +225,30 @@ def main():
     summarise(runs, c)
 
 
+LABELS = {"jev": "jev", "gemini": "gemini-decision-1", "chat": "chat", "replay": "replay"}
+DECISION_PROVIDERS = {"jev": "typesafe", "gemini": "gemini"}
+
+
+def decider_name(label):
+    base = os.environ.get("TYPESAFE_BASE_URL")
+    return f"{label} at {base}" if base else "TypeSafe Jev"
+
+
 def report(row, c):
-    arm = row["arm"]
+    arm = LABELS[row["arm"]]
     if "error" in row:
-        print(f"    {c['cyan']}{arm:<7}{c['reset']} {c['red']}✗{c['reset']} {row['error']}")
+        print(f"    {c['cyan']}{arm:<18}{c['reset']} {c['red']}✗{c['reset']} {row['error']}")
         return row
     secs = row["ms"] / 1000
     mark = f"{c['green']}✓{c['reset']}" if row["ok"] else f"{c['red']}✗{c['reset']}"
     if row["model_calls"]:
         decider = count(row["model_calls"], "chat call")
     elif calls := row["outcome"].get("calls"):
-        decider = count(calls, "jev call")
+        decider = count(calls, "decision call")
     else:
         decider = "no model call"
-    print(f"    {c['cyan']}{arm:<7}{c['reset']} {bar(secs)} {secs:6.2f}s  "
-          f"{decider:<14} {count(row['tool_calls'], 'tool call'):<13} {mark}")
+    print(f"    {c['cyan']}{arm:<18}{c['reset']} {bar(secs)} {secs:6.2f}s  "
+          f"{decider:<16} {count(row['tool_calls'], 'tool call'):<13} {mark}")
     return row
 
 
@@ -237,7 +257,7 @@ def summarise(runs, c):
              if (ms := [r["ms"] for r in rows if r.get("ok")])}
     tokens = sum(r.get("tokens", 0) for r in runs["chat"])
     print(f"\n{c['dim']}  {'─' * 74}{c['reset']}")
-    line = "  ".join(f"{c['bold']}{arm}{c['reset']} {ms / 1000:.2f}s" for arm, ms in times.items())
+    line = "  ".join(f"{c['bold']}{LABELS[arm]}{c['reset']} {ms / 1000:.2f}s" for arm, ms in times.items())
     print(f"  {c['bold']}median{c['reset']}   {line}")
     if "jev" in times and "chat" in times:
         print(f"           {c['yellow']}{times['chat'] / times['jev']:.0f}x{c['reset']} faster "
