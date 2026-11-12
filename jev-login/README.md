@@ -21,9 +21,10 @@ uv run python jev-login/demo.py --site hn    # live HN, decide-only
 | `--base-url` | none | an OpenAI-compatible endpoint, with `--provider openai` |
 | `--timeout` | `300` | seconds per run |
 | `--jev-label` | `jev` | the Jev arm's name, for a [local decider](#local-decider) |
+| `--no-gemini` | off | skip the [`gemini-decision-1`](#gemini-decisions) arm |
 
-The Jev arm needs `TYPESAFE_API_KEY` and the chat arm needs a key for its
-provider. The fixture supplies its own throwaway credentials. `--site hn`
+The Jev arm needs `TYPESAFE_API_KEY`, the Gemini arm `GOOGLE_API_KEY` or
+`GEMINI_API_KEY`, and the chat arm a key for its provider. The fixture supplies its own throwaway credentials. `--site hn`
 reads `$LP_HN_USERNAME` and `$LP_HN_PASSWORD` and passes them as `$LP_*`
 placeholders, which resolve inside the browser, so the secrets stay out of the
 model's context and the result text.
@@ -75,6 +76,35 @@ Its `submitSelector` comes back as
 `form:has(input[type="submit"][value="login"]) > input`. HN serves a sign-in
 form and a create-account form with identically named inputs, and telling them
 apart is the hard part of this page.
+
+## Gemini decisions
+
+`gemini-decision-1` is Google's structured decision model, which zenai calls
+through the Gemini Developer API (not Vertex). It takes the same questions as
+Jev, so `/login` makes the same two calls with no other browser change.
+
+When both a Gemini key and `TYPESAFE_API_KEY` are set, the browser sends
+decisions to Gemini. `LIGHTPANDA_DECISION_PROVIDER` overrides that, so the demo
+sets it to `typesafe` for the Jev arm and to `gemini` for the Gemini arm. The
+chat and replay arms unset all three keys.
+
+Measured 2026-11-12, on one laptop, with a release build of lightpanda
+`16ff86bc7`; 5 fixture runs, all arms interleaved:
+
+| arm | signed in | median | range | round trips |
+| --- | --- | --- | --- | --- |
+| jev | 5/5 | 0.36s | 0.32–0.39s | 2 decision calls |
+| gemini-decision-1 | 5/5 | 0.74s | 0.64–0.76s | 2 decision calls |
+| claude-haiku-5-5 | 5/5 | 4.57s | 3.73–5.40s | 4–5 |
+| replay | 5/5 | 0.00s | up to 0.01s | none |
+
+Gemini takes about twice as long as Jev per decision and is about 6x faster
+than Haiku. Haiku finished in 4 turns in three of these runs, against 5 every
+time in October, which accounts for its lower median.
+
+On live HN (decide-only, 3 runs) Jev's median was 0.20s and Gemini's 0.46s,
+both with one decision call. The traced run's Gemini selectors match Jev's,
+submit included: `form:has(input[type="submit"][value="login"]) > input`.
 
 ## Local decider
 
