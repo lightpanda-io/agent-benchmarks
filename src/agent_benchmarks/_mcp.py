@@ -335,6 +335,8 @@ def allowed_tools_for(backend: str) -> str:
 # --disallowed-tools is the real lockdown.
 DISALLOWED_BUILTIN_TOOLS: tuple[str, ...] = (
     "Bash",
+    # Claude Code on Windows exposes its shell as PowerShell, not Bash.
+    "PowerShell",
     "BashOutput",
     "Edit",
     "Write",
