@@ -19,17 +19,22 @@ Prerequisites:
   - For --backend browser-use:  `browser-use` Python package installed
     (`uv sync` pulls it in via project deps), and a system Chrome/Chromium
     on PATH (browser-use uses cdp-use, not Playwright).
+  - For --backend pilotfish (opt-in):  Node.js 22+ with npx on PATH (the
+    pinned @gaiventures/pilotfish-mcp is fetched by npx), and Google
+    Chrome/Chromium.
 
 Example:
 
     uv run assistantbench-mcp-run --backend lightpanda --limit 3
     uv run assistantbench-mcp-run --backend agent-browser --workers 2
     uv run assistantbench-mcp-run --backend browser-use --workers 2
+    uv run assistantbench-mcp-run --backend pilotfish --workers 4
 """
 
 from __future__ import annotations
 
 import argparse
+import shutil
 import sys
 from pathlib import Path
 from typing import Any
@@ -193,6 +198,10 @@ def main(argv: list[str] | None = None) -> int:
         ok, hint = ensure_browser_use_prereqs()
         if not ok:
             print(f"error: {hint}", file=sys.stderr)
+            return 2
+    elif args.backend == "pilotfish":
+        if shutil.which("npx") is None:
+            print("error: --backend pilotfish needs Node.js 22+ with npx on PATH", file=sys.stderr)
             return 2
 
     out_dir = resolve_out_dir(args.out_dir, PROJECT_ROOT, f"assistantbench-mcp/{args.backend}")
