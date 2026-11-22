@@ -37,8 +37,8 @@ Example:
 from __future__ import annotations
 
 import argparse
-import shutil
 import os
+import shutil
 import sys
 from pathlib import Path
 from typing import Any
@@ -145,9 +145,7 @@ def _build_task_message(task: str, attachment_path: Path | None) -> tuple[str, s
             f"mode ({status}). Answer from the question text and prior knowledge.]"
         )
     else:
-        attach_block = (
-            f"\n\n--- Attachment: {name} ({status}) ---\n{body}\n--- end attachment ---"
-        )
+        attach_block = f"\n\n--- Attachment: {name} ({status}) ---\n{body}\n--- end attachment ---"
     return f"Task: {task}{attach_block}{tail}", status
 
 
@@ -317,7 +315,10 @@ def main(argv: list[str] | None = None) -> int:
         )
     finally:
         sessions = drain_pool(pool)
-        if args.backend in ("agent-browser", "agent-browser-lightpanda") and agent_browser_bin is not None:
+        if (
+            args.backend in ("agent-browser", "agent-browser-lightpanda")
+            and agent_browser_bin is not None
+        ):
             close_agent_browser_sessions(agent_browser_bin, sessions)
         elif args.backend == "browser-use":
             cleanup_browser_use_profiles(sessions)
