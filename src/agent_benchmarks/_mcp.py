@@ -150,9 +150,7 @@ PILOTFISH_TOOLS: tuple[str, ...] = (
 )
 
 # Pinned so a run records exactly what it drove; override with PILOTFISH_MCP_PACKAGE.
-PILOTFISH_MCP_PACKAGE = os.environ.get(
-    "PILOTFISH_MCP_PACKAGE", "@gaiventures/pilotfish-mcp@0.1.73"
-)
+PILOTFISH_MCP_PACKAGE = os.environ.get("PILOTFISH_MCP_PACKAGE", "@gaiventures/pilotfish-mcp@0.1.73")
 
 # MCP server-name keys. These show up in `mcp__<key>__<tool>` allow-list
 # entries, so keep them stable. `agent-browser-lightpanda` deliberately
@@ -191,9 +189,7 @@ def resolve_lightpanda_bin(arg: Path | None, project_root: Path) -> Path:
 def resolve_agent_browser_bin(arg: str | None) -> str:
     if arg:
         return arg
-    return (
-        os.environ.get("AGENT_BROWSER_BIN") or shutil.which("agent-browser") or "agent-browser"
-    )
+    return os.environ.get("AGENT_BROWSER_BIN") or shutil.which("agent-browser") or "agent-browser"
 
 
 def ensure_browser_use_prereqs(python_bin: str | None = None) -> tuple[bool, str]:
@@ -275,9 +271,7 @@ def build_mcp_config(
         }
     if backend in ("agent-browser", "agent-browser-lightpanda"):
         if agent_browser_bin is None:
-            raise ValueError(
-                f"agent_browser_bin is required for the {backend} backend"
-            )
+            raise ValueError(f"agent_browser_bin is required for the {backend} backend")
         python = python_bin or sys.executable
         env: dict[str, str] = {
             "AGENT_BROWSER_BIN": agent_browser_bin,
@@ -620,9 +614,7 @@ def run_mcp_task(
         # are load-bearing (--allowed-tools is permission-prompt bypass only,
         # not a hard restriction, in `claude -p` mode).
         "--disallowed-tools",
-        ",".join(
-            t for t in (disallowed_builtin_tools(), disallowed_mcp_tools(backend)) if t
-        ),
+        ",".join(t for t in (disallowed_builtin_tools(), disallowed_mcp_tools(backend)) if t),
         "--system-prompt",
         system_prompt,
     ]
@@ -796,9 +788,7 @@ def _parse_claude_stream(
             if denials:
                 # Each denial: {"tool_name":"...","tool_use_id":"...","tool_input":{...}}
                 names = [d.get("tool_name", "?") for d in denials if isinstance(d, dict)]
-                note_parts.append(
-                    f"permission_denials ({len(denials)}): {','.join(names)}"
-                )
+                note_parts.append(f"permission_denials ({len(denials)}): {','.join(names)}")
             result = evt.get("result", "")
             if evt.get("is_error"):
                 note_parts.append(f"claude is_error=true: {str(result)[:200]!r}")

@@ -280,7 +280,10 @@ def main(argv: list[str] | None = None) -> int:
         # be told to close. browser-use leaves a per-worker profile tempdir
         # that we should rm-rf so /tmp doesn't accumulate hundreds of MBs.
         sessions = drain_pool(pool)
-        if args.backend in ("agent-browser", "agent-browser-lightpanda") and agent_browser_bin is not None:
+        if (
+            args.backend in ("agent-browser", "agent-browser-lightpanda")
+            and agent_browser_bin is not None
+        ):
             close_agent_browser_sessions(agent_browser_bin, sessions)
         elif args.backend == "browser-use":
             cleanup_browser_use_profiles(sessions)
