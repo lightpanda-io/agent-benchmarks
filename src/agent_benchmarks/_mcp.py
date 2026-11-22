@@ -334,7 +334,8 @@ def build_mcp_config(
         npx_args = ["-y", PILOTFISH_MCP_PACKAGE]
         local_cli = os.environ.get("PILOTFISH_MCP_CLI")
         if local_cli:
-            # A local build of the server (its dist/cli.js), to test a change before it is published.
+            # A local build of the server (its dist/cli.js), to test a change
+            # before it is published.
             command, args = "node", [local_cli]
         elif sys.platform == "win32":
             command, args = "cmd", ["/c", "npx", *npx_args]
@@ -832,7 +833,13 @@ def add_common_mcp_args(parser: Any) -> None:
     """Shared argparse flags for an MCP-backed suite runner."""
     parser.add_argument(
         "--backend",
-        choices=["lightpanda", "agent-browser", "agent-browser-lightpanda", "browser-use", "pilotfish"],
+        choices=[
+            "lightpanda",
+            "agent-browser",
+            "agent-browser-lightpanda",
+            "browser-use",
+            "pilotfish",
+        ],
         required=True,
         help="Which browser MCP to drive Claude with. `agent-browser-lightpanda` "
         "drives agent-browser's MCP tools but with Lightpanda as the underlying "
