@@ -123,6 +123,37 @@ BROWSER_USE_TOOLS: tuple[str, ...] = (
     "browser_close_tab",
 )
 
+# pilotfish's open MCP server (`npx -y @gaiventures/pilotfish-mcp`, MIT). It makes
+# no model calls of its own: Claude drives every step. Two tools are left out and
+# hard-denied below to keep the comparison text-only and unattended:
+#
+#   - browser_screenshot: returns an image (multimodal), as with browser-use.
+#   - browser_resume: waits for a person to deal with a page after a result
+#     said NEEDS A PERSON; there is no person in a headless benchmark run.
+PILOTFISH_TOOLS: tuple[str, ...] = (
+    "browser_navigate",
+    "browser_search",
+    "browser_snapshot",
+    "browser_click",
+    "browser_type",
+    "browser_select",
+    "browser_press",
+    "browser_scroll",
+    "browser_actions",
+    "browser_query",
+    "browser_find",
+    "browser_get_text",
+    "browser_wait",
+    "browser_page_tool",
+    "browser_tabs",
+    "browser_close",
+)
+
+# Pinned so a run records exactly what it drove; override with PILOTFISH_MCP_PACKAGE.
+PILOTFISH_MCP_PACKAGE = os.environ.get(
+    "PILOTFISH_MCP_PACKAGE", "@gaiventures/pilotfish-mcp@0.1.73"
+)
+
 # MCP server-name keys. These show up in `mcp__<key>__<tool>` allow-list
 # entries, so keep them stable. `agent-browser-lightpanda` deliberately
 # reuses the `agent-browser` server name — same MCP tool surface (the
@@ -133,6 +164,7 @@ SERVER_NAME = {
     "agent-browser": "agent-browser",
     "agent-browser-lightpanda": "agent-browser",
     "browser-use": "browser-use",
+    "pilotfish": "pilotfish",
 }
 
 
@@ -296,6 +328,28 @@ def build_mcp_config(
                 }
             }
         }
+    if backend == "pilotfish":
+        # One stdio server per claude call, so each worker gets its own Chrome.
+        # On Windows npx is a .cmd shim, which a stdio spawn cannot run directly.
+        npx_args = ["-y", PILOTFISH_MCP_PACKAGE]
+        local_cli = os.environ.get("PILOTFISH_MCP_CLI")
+        if local_cli:
+            # A local build of the server (its dist/cli.js), to test a change before it is published.
+            command, args = "node", [local_cli]
+        elif sys.platform == "win32":
+            command, args = "cmd", ["/c", "npx", *npx_args]
+        else:
+            command, args = "npx", npx_args
+        return {
+            "mcpServers": {
+                SERVER_NAME["pilotfish"]: {
+                    "type": "stdio",
+                    "command": command,
+                    "args": args,
+                    "env": {"PILOTFISH_HEADLESS": "1"},
+                }
+            }
+        }
     raise ValueError(f"unknown backend: {backend}")
 
 
@@ -317,6 +371,9 @@ def allowed_tools_for(backend: str) -> str:
     elif backend == "browser-use":
         server = SERVER_NAME["browser-use"]
         tools = BROWSER_USE_TOOLS
+    elif backend == "pilotfish":
+        server = SERVER_NAME["pilotfish"]
+        tools = PILOTFISH_TOOLS
     else:
         raise ValueError(f"unknown backend: {backend}")
     return ",".join(f"mcp__{server}__{t}" for t in tools)
@@ -406,6 +463,12 @@ DISALLOWED_MCP_TOOLS_BY_BACKEND: dict[str, tuple[str, ...]] = {
         "mcp__browser-use__browser_list_sessions",
         "mcp__browser-use__browser_close_session",
         "mcp__browser-use__browser_close_all",
+    ),
+    "pilotfish": (
+        # Multimodal — text-only-parity violation.
+        "mcp__pilotfish__browser_screenshot",
+        # Waits for a person; none in an unattended run.
+        "mcp__pilotfish__browser_resume",
     ),
 }
 
@@ -769,7 +832,7 @@ def add_common_mcp_args(parser: Any) -> None:
     """Shared argparse flags for an MCP-backed suite runner."""
     parser.add_argument(
         "--backend",
-        choices=["lightpanda", "agent-browser", "agent-browser-lightpanda", "browser-use"],
+        choices=["lightpanda", "agent-browser", "agent-browser-lightpanda", "browser-use", "pilotfish"],
         required=True,
         help="Which browser MCP to drive Claude with. `agent-browser-lightpanda` "
         "drives agent-browser's MCP tools but with Lightpanda as the underlying "

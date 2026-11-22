@@ -3,7 +3,8 @@ GAIA runner that drives a browser MCP server through `claude -p`.
 
 Mirrors `assistantbench-mcp-run` for GAIA: hold the LLM brain (Claude)
 constant; vary only the browser MCP (`--backend lightpanda`,
-`--backend agent-browser`, or `--backend browser-use`). Writes the same
+`--backend agent-browser`, `--backend browser-use`, or the opt-in
+`--backend pilotfish`). Writes the same
 predictions.jsonl envelope as `gaia-run`, so `gaia-grade` reads it without
 modification.
 
@@ -22,17 +23,21 @@ Prerequisites:
   - For --backend agent-browser: agent-browser installed
   - For --backend browser-use: `uv sync` (pulls in browser-use) + a system
     Chrome/Chromium binary on PATH
+  - For --backend pilotfish (opt-in): Node.js 22+ with npx on PATH (the pinned
+    @gaiventures/pilotfish-mcp is fetched by npx) + Google Chrome/Chromium
 
 Example:
 
     HF_TOKEN=... uv run gaia-mcp-run --backend lightpanda --limit 3
     HF_TOKEN=... uv run gaia-mcp-run --backend agent-browser --workers 2
     HF_TOKEN=... uv run gaia-mcp-run --backend browser-use --workers 2
+    HF_TOKEN=... uv run gaia-mcp-run --backend pilotfish --workers 4
 """
 
 from __future__ import annotations
 
 import argparse
+import shutil
 import os
 import sys
 from pathlib import Path
@@ -201,6 +206,10 @@ def main(argv: list[str] | None = None) -> int:
         ok, hint = ensure_browser_use_prereqs()
         if not ok:
             print(f"error: {hint}", file=sys.stderr)
+            return 2
+    elif args.backend == "pilotfish":
+        if shutil.which("npx") is None:
+            print("error: --backend pilotfish needs Node.js 22+ with npx on PATH", file=sys.stderr)
             return 2
 
     out_dir = resolve_out_dir(args.out_dir, PROJECT_ROOT, f"gaia-mcp/{args.backend}")
