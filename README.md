@@ -231,6 +231,15 @@ uv run gaia-mcp-run --backend browser-use \
 
 Results land in `results/<suite>-mcp/<backend>/<timestamp>/`.
 
+**Answer-key lookups are blocked by default** in these runners. A Claude
+Code `PreToolUse` hook, passed per run with `claude --settings`, denies any
+MCP tool call whose URL, query or script names the suite's task ids, the
+benchmark itself in a search ("GAIA benchmark", "AssistantBench"), or one
+of the dataset and agent-trace repos in `src/agent_benchmarks/lookup_block.py`.
+The manifest records `block_lookups`, and the graders add `lookup_attempted`
+per task plus a score with those tasks counted wrong, so runs with
+`--no-block-lookups` stay comparable.
+
 ### Running agent-browser standalone (no MCP)
 
 A second comparison path runs agent-browser's own `chat` mode directly, which

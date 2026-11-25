@@ -572,12 +572,19 @@ def emit_scores(scores: dict[str, Any], out_dir: Path) -> None:
 # it from CLI args. agent_model=None means the provider's baked-in default
 # was used. `argv` is the full launch line — the canonical "how to
 # reproduce this run" record (resume the same out-dir + same flags).
-def write_run_manifest(out_dir: Path, *, agent_provider: str, agent_model: str | None) -> None:
+def write_run_manifest(
+    out_dir: Path,
+    *,
+    agent_provider: str,
+    agent_model: str | None,
+    extra: dict[str, Any] | None = None,
+) -> None:
     manifest = {
         "agent_provider": agent_provider,
         "agent_model": agent_model,
         "argv": sys.argv,
         "started_at": datetime.now(UTC).isoformat(),
+        **(extra or {}),
     }
     (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2))
 

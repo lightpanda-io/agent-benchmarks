@@ -50,6 +50,7 @@ from .._mcp import (
     drain_pool,
     ensure_browser_use_prereqs,
     ensure_executable,
+    lookup_manifest_fields,
     make_session_pool,
     resolve_agent_browser_bin,
     resolve_claude_bin,
@@ -63,6 +64,7 @@ from ..common import (
     run_benchmark_tasks,
     write_run_manifest,
 )
+from ..lookup_block import write_hook_config
 from .grade import grade_predictions
 
 # benchmarks/src/agent_benchmarks/assistantbench/run_mcp.py → benchmarks/
@@ -210,6 +212,7 @@ def main(argv: list[str] | None = None) -> int:
         out_dir,
         agent_provider=f"claude-mcp-{args.backend}",
         agent_model=args.model,
+        extra=lookup_manifest_fields(args.block_lookups),
     )
 
     completed = load_completed_ids(predictions_path) if args.resume else set()
@@ -219,6 +222,12 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Loading AssistantBench/{args.split} from HuggingFace...", file=sys.stderr)
     ds = load_dataset("AssistantBench/AssistantBench", split=args.split)
     rows: list[dict[str, Any]] = list(ds)
+    # The hook blocks every task id of the split, not only the ones run.
+    lookup_hook_config = (
+        write_hook_config(out_dir / "lookup-block.json", (r["id"] for r in rows))
+        if args.block_lookups
+        else None
+    )
     if args.limit is not None:
         rows = rows[: args.limit]
 
@@ -244,6 +253,7 @@ def main(argv: list[str] | None = None) -> int:
                 task_prompt=TASK_PROMPT_TEMPLATE.format(task=row["task"]),
                 model=args.model,
                 timeout_s=args.timeout,
+                lookup_hook_config=lookup_hook_config,
             )
         finally:
             pool.put(session)
