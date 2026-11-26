@@ -96,20 +96,24 @@ _REPO_RE = re.compile(
 # mission (its data releases, "GAIA DR3"), and "assistant bench" is
 # furniture, so both only count next to a benchmark word. "AssistantBench"
 # written as one word is only ever the benchmark.
-_BENCH_WORDS = r"benchmarks?|leaderboard|validation|level\W{0,3}[123]|answers?"
+_BENCH_WORDS = r"benchmarks?|leaderboard|validation|test[\W_]?set|level[\W_]{0,3}[123]|answers?"
 _NAMES = r"gaia|assistant\W?bench"
 _BENCHMARK_QUERY_RE = re.compile(
     r"\bassistant[-_]?bench\b"
-    rf"|\b(?:{_NAMES})\W{{1,3}}(?:{_BENCH_WORDS})\b"
-    rf"|\b(?:{_BENCH_WORDS})\W{{1,3}}(?:{_NAMES})\b",
+    rf"|(?<![^\W_])(?:{_NAMES})[\W_]{{1,3}}(?:{_BENCH_WORDS})(?![^\W_])"
+    rf"|(?<![^\W_])(?:{_BENCH_WORDS})[\W_]{{1,3}}(?:{_NAMES})(?![^\W_])",
     re.IGNORECASE,
 )
 
 # A local file. GAIA attachments are named <task_id>.<ext> and agents open
 # them by path: the native runners hand over their own copy, and MCP runs
 # guess file:///tmp/<task_id>.xlsx. That names the task without looking it
-# up, so task ids are not checked in a local path.
-_LOCAL_PATH_RE = re.compile(r"^\s*(?:file:|/|~[\\/]|\.{1,2}[\\/]|[a-z]:[\\/])", re.IGNORECASE)
+# up, so task ids are not checked in a local path: one token, as given (not
+# URL-decoded), that is a file: URL or a path. `//host/…` (protocol-relative)
+# and `/* … */` or `// …` (a script's comment) are not paths.
+_LOCAL_PATH_RE = re.compile(
+    r"^\s*(?:file:|/(?![/*])|~[\\/]|\.{1,2}[\\/]|[a-z]:[\\/])\S*\s*$", re.IGNORECASE
+)
 
 
 def _strings(value: Any) -> Iterator[str]:
@@ -146,7 +150,7 @@ def lookup_reason(args: Any, task_ids: Iterable[str] = ()) -> str | None:
         host = next((h for h in _SPACE_HOSTS if h in low), None)
         if host:
             return f"a copy of the benchmark or of agents' runs on it ({host})"
-        if not _LOCAL_PATH_RE.match(text):
+        if not _LOCAL_PATH_RE.match(raw):
             task_id = next((t for t in ids if t in low), None)
             if task_id:
                 return f"the benchmark's task id ({task_id})"
@@ -180,7 +184,8 @@ def hook_settings(config_path: Path, python: str | None = None) -> dict[str, Any
 
 
 def write_hook_config(path: Path, task_ids: Iterable[str]) -> Path:
-    """Store the suite's task ids for the hook to read on every call."""
+    """Store the suite's task ids for the hook to read on every call and for
+    the grader (`grading_task_ids`). Runners write it with blocking on or off."""
     path.write_text(json.dumps({"task_ids": sorted(set(task_ids))}, indent=0))
     return path
 

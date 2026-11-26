@@ -234,12 +234,14 @@ def main(argv: list[str] | None = None) -> int:
         )
     ds = load_dataset("gaia-benchmark/GAIA", config, split=args.split)
     rows: list[dict[str, Any]] = list(ds)
-    # The hook blocks every task id of the split, not only the ones run.
-    lookup_hook_config = (
-        write_hook_config(out_dir / "lookup-block.json", (r["task_id"] for r in rows))
-        if args.block_lookups
-        else None
+    # Every task id of the split, all levels, not only the ones run: the hook
+    # blocks them when --block-lookups is on, and the grader flags them
+    # either way.
+    all_levels = load_dataset("gaia-benchmark/GAIA", "2023_all", split=args.split)
+    lookup_ids_path = write_hook_config(
+        out_dir / "lookup-block.json", (r["task_id"] for r in all_levels)
     )
+    lookup_hook_config = lookup_ids_path if args.block_lookups else None
 
     snapshot_dir: Path | None = None
     if not args.skip_attachments and any((r.get("file_name") or "").strip() for r in rows):
