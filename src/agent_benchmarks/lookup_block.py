@@ -33,6 +33,7 @@ once per tool call.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import re
 import sys
@@ -91,17 +92,24 @@ _REPO_RE = re.compile(
     r"(?<![\w.-])(?:" + "|".join(re.escape(r.lower()) for r in DENIED_REPOS) + r")(?![\w.-])"
 )
 
-# The benchmark named in a search or URL. "Gaia" alone is the ESA mission or
-# the goddess, so lower-case "gaia" only counts next to a benchmark word;
-# all-caps "GAIA" counts on its own.
-_BENCH_WORDS = r"benchmarks?|leaderboard|dataset|validation|level\W{0,3}[123]|answers?"
+# The benchmark named in a search or URL. "Gaia" in any case is also the ESA
+# mission (its data releases, "GAIA DR3"), and "assistant bench" is
+# furniture, so both only count next to a benchmark word. "AssistantBench"
+# written as one word is only ever the benchmark.
+_BENCH_WORDS = r"benchmarks?|leaderboard|validation|level\W{0,3}[123]|answers?"
+_NAMES = r"gaia|assistant\W?bench"
 _BENCHMARK_QUERY_RE = re.compile(
-    r"\bassistant\W?bench\b"
-    rf"|\bgaia\W{{1,3}}(?:{_BENCH_WORDS})\b"
-    rf"|\b(?:{_BENCH_WORDS})\W{{1,3}}gaia\b",
+    r"\bassistant[-_]?bench\b"
+    rf"|\b(?:{_NAMES})\W{{1,3}}(?:{_BENCH_WORDS})\b"
+    rf"|\b(?:{_BENCH_WORDS})\W{{1,3}}(?:{_NAMES})\b",
     re.IGNORECASE,
 )
-_GAIA_CAPS_RE = re.compile(r"(?<![\w-])GAIA(?![\w-])")
+
+# A local file. GAIA attachments are named <task_id>.<ext> and agents open
+# them by path: the native runners hand over their own copy, and MCP runs
+# guess file:///tmp/<task_id>.xlsx. That names the task without looking it
+# up, so task ids are not checked in a local path.
+_LOCAL_PATH_RE = re.compile(r"^\s*(?:file:|/|~[\\/]|\.{1,2}[\\/]|[a-z]:[\\/])", re.IGNORECASE)
 
 
 def _strings(value: Any) -> Iterator[str]:
@@ -126,7 +134,8 @@ def lookup_reason(args: Any, task_ids: Iterable[str] = ()) -> str | None:
     """Why a tool call with `args` is an answer-key lookup, or None.
 
     `task_ids` are the suite's own ids (GAIA UUIDs, AssistantBench hashes):
-    they only appear in copies of the benchmark."""
+    they only appear in copies of the benchmark, and in the name of a task's
+    own attachment, which is why local file paths are not checked for them."""
     ids = [t.lower() for t in task_ids if t]
     for raw in _strings(args):
         text = _decoded(raw)
@@ -137,10 +146,11 @@ def lookup_reason(args: Any, task_ids: Iterable[str] = ()) -> str | None:
         host = next((h for h in _SPACE_HOSTS if h in low), None)
         if host:
             return f"a copy of the benchmark or of agents' runs on it ({host})"
-        task_id = next((t for t in ids if t in low), None)
-        if task_id:
-            return f"the benchmark's task id ({task_id})"
-        m = _BENCHMARK_QUERY_RE.search(text) or _GAIA_CAPS_RE.search(text)
+        if not _LOCAL_PATH_RE.match(text):
+            task_id = next((t for t in ids if t in low), None)
+            if task_id:
+                return f"the benchmark's task id ({task_id})"
+        m = _BENCHMARK_QUERY_RE.search(text)
         if m:
             return f"the benchmark's name ({m.group(0)!r})"
     return None
@@ -204,6 +214,18 @@ def run_hook(config_path: Path, stdin: str) -> str:
 
 
 # --- Grading ---------------------------------------------------------------
+
+
+def grading_task_ids(predictions_path: Path, run_ids: Iterable[str]) -> list[str]:
+    """The task ids a grader checks traces for: the ids in the predictions
+    file, plus the whole split's from the run's `lookup-block.json` when the
+    runner wrote one, so a `--limit` or partial run still flags a search for
+    a task it didn't run."""
+    ids = {t for t in run_ids if t}
+    config = predictions_path.parent / "lookup-block.json"
+    with contextlib.suppress(OSError, ValueError, KeyError, TypeError):
+        ids.update(json.loads(config.read_text())["task_ids"])
+    return sorted(ids)
 
 
 def lookup_flags(trace: list[dict[str, Any]] | None, task_ids: Iterable[str]) -> dict[str, Any]:

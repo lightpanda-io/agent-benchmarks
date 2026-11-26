@@ -32,7 +32,7 @@ from pathlib import Path
 from typing import Any
 
 from ..common import mean, read_run_manifest, summarize_usage
-from ..lookup_block import lookup_flags
+from ..lookup_block import grading_task_ids, lookup_flags
 
 _ARTICLES = {"a", "an", "the"}
 _PUNCT_TABLE = str.maketrans("", "", string.punctuation)
@@ -170,7 +170,7 @@ def grade_predictions(predictions_path: Path) -> dict[str, Any]:
     durations = [t.get("duration_s", 0.0) for t, _, _ in scored]
     usage_summary = summarize_usage(t for t, _, _ in scored)
     # Answer-key lookups, attempted or blocked; see lookup_block.py.
-    task_ids = [t.get("id") for t, _, _ in scored if t.get("id")]
+    task_ids = grading_task_ids(predictions_path, (t.get("id") for t, _, _ in scored))
     lookups = [lookup_flags(t.get("trace"), task_ids) for t, _, _ in scored]
 
     by_level: dict[str, list[tuple[float, float]]] = {}
@@ -204,6 +204,10 @@ def grade_predictions(predictions_path: Path) -> dict[str, Any]:
         "accuracy_lookups_wrong": mean(
             0.0 if lk["lookup_attempted"] else s
             for (_, s, _), lk in zip(scored, lookups, strict=True)
+        ),
+        "accuracy_soft_lookups_wrong": mean(
+            0.0 if lk["lookup_attempted"] else s
+            for (_, _, s), lk in zip(scored, lookups, strict=True)
         ),
         "by_level": {
             k: {
