@@ -33,6 +33,7 @@ from pathlib import Path
 from typing import Any
 
 from ..common import mean, read_run_manifest, summarize_usage
+from ..lookup_block import grading_task_ids, lookup_flags
 
 _PUNCT_TABLE = str.maketrans("", "", string.punctuation)
 
@@ -232,6 +233,12 @@ def grade_predictions(predictions_path: Path) -> dict[str, Any]:
     timeouts = sum(1 for t, _ in scored if t.get("timed_out"))
     durations = [t.get("duration_s", 0.0) for t, _ in scored]
     usage_summary = summarize_usage(t for t, _ in scored)
+    # Answer-key lookups, attempted or blocked; see lookup_block.py.
+    task_ids = grading_task_ids(predictions_path, (t.get("id") for t, _ in scored))
+    lookups = [lookup_flags(t.get("trace"), task_ids) for t, _ in scored]
+    clean = [
+        0.0 if lk["lookup_attempted"] else s for (_, s), lk in zip(scored, lookups, strict=True)
+    ]
 
     by_diff: dict[str, list[float]] = {}
     for t, s in scored:
@@ -245,6 +252,11 @@ def grade_predictions(predictions_path: Path) -> dict[str, Any]:
         "timeouts": timeouts,
         "accuracy_soft": mean(s for _, s in scored),
         "accuracy_strict": mean(1.0 if s >= 0.5 else 0.0 for _, s in scored),
+        "n_lookup_attempted": sum(lk["lookup_attempted"] for lk in lookups),
+        "n_lookup_blocked_calls": sum(lk["lookup_blocked"] for lk in lookups),
+        # Tasks that tried a lookup counted wrong, blocked or not.
+        "accuracy_soft_lookups_wrong": mean(clean),
+        "accuracy_strict_lookups_wrong": mean(1.0 if s >= 0.5 else 0.0 for s in clean),
         "by_difficulty": {
             k: {
                 "n": len(v),
@@ -263,8 +275,9 @@ def grade_predictions(predictions_path: Path) -> dict[str, Any]:
                 "timed_out": bool(t.get("timed_out")),
                 "duration_s": t.get("duration_s"),
                 "usage": t.get("usage"),
+                **lk,
             }
-            for t, s in scored
+            for (t, s), lk in zip(scored, lookups, strict=True)
         ],
     }
 

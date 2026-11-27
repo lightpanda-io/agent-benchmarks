@@ -32,6 +32,7 @@ from pathlib import Path
 from typing import Any
 
 from ..common import mean, read_run_manifest, summarize_usage
+from ..lookup_block import grading_task_ids, lookup_flags
 
 _ARTICLES = {"a", "an", "the"}
 _PUNCT_TABLE = str.maketrans("", "", string.punctuation)
@@ -168,10 +169,13 @@ def grade_predictions(predictions_path: Path) -> dict[str, Any]:
     timeouts = sum(1 for t, _, _ in scored if t.get("timed_out"))
     durations = [t.get("duration_s", 0.0) for t, _, _ in scored]
     usage_summary = summarize_usage(t for t, _, _ in scored)
+    # Answer-key lookups, attempted or blocked; see lookup_block.py.
+    task_ids = grading_task_ids(predictions_path, (t.get("id") for t, _, _ in scored))
+    lookups = [lookup_flags(t.get("trace"), task_ids) for t, _, _ in scored]
 
     by_level: dict[str, list[tuple[float, float]]] = {}
     per_task: list[dict[str, Any]] = []
-    for t, s_strict, s_soft in scored:
+    for (t, s_strict, s_soft), lk in zip(scored, lookups, strict=True):
         level = t.get("level") or t.get("Level")
         by_level.setdefault(str(level) if level is not None else "?", []).append((s_strict, s_soft))
         per_task.append(
@@ -183,6 +187,7 @@ def grade_predictions(predictions_path: Path) -> dict[str, Any]:
                 "timed_out": bool(t.get("timed_out")),
                 "duration_s": t.get("duration_s"),
                 "usage": t.get("usage"),
+                **lk,
             }
         )
 
@@ -193,6 +198,17 @@ def grade_predictions(predictions_path: Path) -> dict[str, Any]:
         "timeouts": timeouts,
         "accuracy": mean(s for _, s, _ in scored),
         "accuracy_soft": mean(s for _, _, s in scored),
+        "n_lookup_attempted": sum(lk["lookup_attempted"] for lk in lookups),
+        "n_lookup_blocked_calls": sum(lk["lookup_blocked"] for lk in lookups),
+        # Tasks that tried a lookup counted wrong, blocked or not.
+        "accuracy_lookups_wrong": mean(
+            0.0 if lk["lookup_attempted"] else s
+            for (_, s, _), lk in zip(scored, lookups, strict=True)
+        ),
+        "accuracy_soft_lookups_wrong": mean(
+            0.0 if lk["lookup_attempted"] else s
+            for (_, _, s), lk in zip(scored, lookups, strict=True)
+        ),
         "by_level": {
             k: {
                 "n": len(v),

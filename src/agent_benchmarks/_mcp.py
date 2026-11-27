@@ -22,6 +22,7 @@ This helper is additive.
 
 from __future__ import annotations
 
+import argparse
 import contextlib
 import json
 import os
@@ -35,6 +36,7 @@ from pathlib import Path
 from typing import Any
 
 from .common import extract_answer_envelope as _extract_answer_envelope
+from .lookup_block import BLOCK_MARKER, DENIED_REPOS, HOOK_MATCHER, hook_settings
 
 STDERR_TAIL_BYTES = 8 * 1024
 
@@ -575,6 +577,7 @@ def run_mcp_task(
     task_prompt: str,
     model: str | None,
     timeout_s: float,
+    lookup_hook_config: Path | None = None,
 ) -> tuple[str, float, bool, str, int | None, list[dict[str, Any]], dict[str, Any] | None]:
     """Run one benchmark task through `claude -p` + the chosen MCP backend.
 
@@ -588,6 +591,12 @@ def run_mcp_task(
     claude failed before any assistant turn).
     On error or empty output, the prediction is an empty string and the
     error is surfaced via stderr_tail.
+
+    `lookup_hook_config` (from `lookup_block.write_hook_config`) turns on the
+    answer-key blocking hook for this call. It goes in through `--settings`,
+    so it doesn't depend on the runner's own Claude settings, and it holds
+    under `--strict-mcp-config`, which only limits MCP servers. Calls it
+    denies are marked `"blocked": true` in the trace.
     """
     # stream-json gives us per-event log instead of the single-blob `json`
     # mode, so we can collect tool_use blocks for the trace AND see in the
@@ -620,6 +629,8 @@ def run_mcp_task(
     ]
     if model:
         cmd += ["--model", model]
+    if lookup_hook_config is not None:
+        cmd += ["--settings", json.dumps(hook_settings(lookup_hook_config))]
     # Use stdin for the task to avoid argv-length surprises on long prompts
     # (GAIA attachments can run to tens of KB) and to keep the task body out
     # of `ps`/process listings.
@@ -734,6 +745,7 @@ def _parse_claude_stream(
         return "", [], None, "empty stdout from claude --print"
 
     trace: list[dict[str, Any]] = []
+    trace_index_by_id: dict[str, int] = {}
     prediction = ""
     note_parts: list[str] = []
     saw_result = False
@@ -766,6 +778,8 @@ def _parse_claude_stream(
             content = message.get("content") or []
             for block in content:
                 if isinstance(block, dict) and block.get("type") == "tool_use":
+                    if block.get("id"):
+                        trace_index_by_id[block["id"]] = len(trace)
                     trace.append(
                         {
                             "tool": block.get("name", "?"),
@@ -799,7 +813,19 @@ def _parse_claude_stream(
             cost = evt.get("total_cost_usd")
             if isinstance(cost, (int, float)):
                 total_cost_usd = float(cost)
-        # else: system, user (tool_result), status events — skipped
+        elif etype == "user":
+            # A tool_result carrying the lookup hook's marker
+            # is a call the hook denied.
+            for block in (evt.get("message") or {}).get("content") or []:
+                if (
+                    isinstance(block, dict)
+                    and block.get("type") == "tool_result"
+                    and BLOCK_MARKER in _tool_result_text(block.get("content"))
+                ):
+                    i = trace_index_by_id.get(block.get("tool_use_id", ""))
+                    if i is not None:
+                        trace[i]["blocked"] = True
+        # else: system, status events — skipped
 
     if not saw_result:
         note_parts.append("no terminal `result` event in stream")
@@ -817,6 +843,26 @@ def _parse_claude_stream(
 
     note = "; ".join(note_parts) if note_parts else None
     return prediction, trace, usage, note
+
+
+def _tool_result_text(content: Any) -> str:
+    """A tool_result's content as text: a string, or a list of text blocks."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return " ".join(
+            b.get("text", "") for b in content if isinstance(b, dict) and b.get("type") == "text"
+        )
+    return ""
+
+
+def lookup_manifest_fields(enabled: bool) -> dict[str, Any]:
+    """What a run's manifest records about answer-key blocking."""
+    fields: dict[str, Any] = {"block_lookups": enabled}
+    if enabled:
+        fields["lookup_hook_matcher"] = HOOK_MATCHER
+        fields["lookup_denied_repos"] = list(DENIED_REPOS)
+    return fields
 
 
 def add_common_mcp_args(parser: Any) -> None:
@@ -890,4 +936,13 @@ def add_common_mcp_args(parser: Any) -> None:
         "--resume",
         action="store_true",
         help="Skip task ids already present in <out-dir>/predictions.jsonl",
+    )
+    parser.add_argument(
+        "--block-lookups",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Deny tool calls that look up the benchmark's own answers (its task ids, "
+        "its name in a search, copies of it and of agents' runs on it; see "
+        "lookup_block.py) with a Claude Code PreToolUse hook on every MCP tool. On by "
+        "default; recorded in manifest.json.",
     )

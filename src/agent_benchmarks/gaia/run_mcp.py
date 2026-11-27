@@ -54,6 +54,7 @@ from .._mcp import (
     drain_pool,
     ensure_browser_use_prereqs,
     ensure_executable,
+    lookup_manifest_fields,
     make_session_pool,
     resolve_agent_browser_bin,
     resolve_claude_bin,
@@ -67,6 +68,7 @@ from ..common import (
     run_benchmark_tasks,
     write_run_manifest,
 )
+from ..lookup_block import write_hook_config
 from .grade import grade_predictions
 
 # Read-only reuse of the attachment-inlining logic from the agent-browser
@@ -216,6 +218,7 @@ def main(argv: list[str] | None = None) -> int:
         out_dir,
         agent_provider=f"claude-mcp-{args.backend}",
         agent_model=args.model,
+        extra=lookup_manifest_fields(args.block_lookups),
     )
 
     completed = load_completed_ids(predictions_path) if args.resume else set()
@@ -231,6 +234,14 @@ def main(argv: list[str] | None = None) -> int:
         )
     ds = load_dataset("gaia-benchmark/GAIA", config, split=args.split)
     rows: list[dict[str, Any]] = list(ds)
+    # Every task id of the split, all levels, not only the ones run: the hook
+    # blocks them when --block-lookups is on, and the grader flags them
+    # either way.
+    all_levels = load_dataset("gaia-benchmark/GAIA", "2023_all", split=args.split)
+    lookup_ids_path = write_hook_config(
+        out_dir / "lookup-block.json", (r["task_id"] for r in all_levels)
+    )
+    lookup_hook_config = lookup_ids_path if args.block_lookups else None
 
     snapshot_dir: Path | None = None
     if not args.skip_attachments and any((r.get("file_name") or "").strip() for r in rows):
@@ -281,6 +292,7 @@ def main(argv: list[str] | None = None) -> int:
                 task_prompt=task_message,
                 model=args.model,
                 timeout_s=args.timeout,
+                lookup_hook_config=lookup_hook_config,
             )
         finally:
             pool.put(session)
