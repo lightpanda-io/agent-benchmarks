@@ -114,6 +114,12 @@ _BENCHMARK_QUERY_RE = re.compile(
 _LOCAL_PATH_RE = re.compile(
     r"^\s*(?:file:|/(?![/*])|~[\\/]|\.{1,2}[\\/]|[a-z]:[\\/])\S*\s*$", re.IGNORECASE
 )
+# A file: URL inside a longer string, such as a script that fetches its own
+# attachment. It can't reach the web, so it is removed before the task-id
+# check; the rest of the string is still checked. Only one that starts the
+# string or follows a space, quote or bracket: `?to=file:///…` inside a web
+# URL is part of that URL.
+_FILE_URL_RE = re.compile(r"(?<![^\s'\"`(\[{<,;])file:[^\s'\"`)\]}>,;]*", re.IGNORECASE)
 
 
 def _strings(value: Any) -> Iterator[str]:
@@ -151,7 +157,8 @@ def lookup_reason(args: Any, task_ids: Iterable[str] = ()) -> str | None:
         if host:
             return f"a copy of the benchmark or of agents' runs on it ({host})"
         if not _LOCAL_PATH_RE.match(raw):
-            task_id = next((t for t in ids if t in low), None)
+            web = _decoded(_FILE_URL_RE.sub(" ", raw)).lower()
+            task_id = next((t for t in ids if t in web), None)
             if task_id:
                 return f"the benchmark's task id ({task_id})"
         m = _BENCHMARK_QUERY_RE.search(text)
