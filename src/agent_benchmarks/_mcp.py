@@ -387,6 +387,15 @@ def allowed_tools_for(backend: str) -> str:
 # with 67× WebSearch, 48× WebFetch, 14× Bash, 11× Read, 11× Grep, 1× Agent
 # all alongside the MCP calls. The browser comparison was contaminated.
 # --disallowed-tools is the real lockdown.
+#
+# A deny list also misses tools Claude Code adds later. In November a GAIA
+# worker used SendMessage to ask another Claude session on the same machine
+# to transcribe its attachment, and May runs called RemoteTrigger and
+# Workflow, none of which were listed. So the runner now also passes
+# `--tools` with BUILTIN_TOOLS (an allowlist of built-in tools; MCP tools
+# are unaffected) and keeps this list as a second layer.
+BUILTIN_TOOLS: tuple[str, ...] = ("ToolSearch",)
+
 DISALLOWED_BUILTIN_TOOLS: tuple[str, ...] = (
     "Bash",
     # Claude Code on Windows exposes its shell as PowerShell, not Bash.
@@ -422,6 +431,15 @@ DISALLOWED_BUILTIN_TOOLS: tuple[str, ...] = (
     "CronList",
     "ListMcpResourcesTool",
     "ReadMcpResourceTool",
+    "ReadMcpResourceDirTool",
+    # Reach other Claude sessions, cloud agents or the user.
+    "SendMessage",
+    "ListAgents",
+    "ReadNotifications",
+    "FetchInboxMessage",
+    "RemoteTrigger",
+    "SendUserFile",
+    "Workflow",
     # ToolSearch is intentionally NOT in this list — Claude Code uses it to
     # fetch deferred MCP tool schemas, so denying it would break MCP usage.
     # ToolSearch only loads schemas; it can't bypass --disallowed-tools to
@@ -622,6 +640,9 @@ def run_mcp_task(
         # DISALLOWED_BUILTIN_TOOLS / DISALLOWED_MCP_TOOLS_BY_BACKEND — both
         # are load-bearing (--allowed-tools is permission-prompt bypass only,
         # not a hard restriction, in `claude -p` mode).
+        # Built-in tools Claude may use at all (MCP tools aren't affected).
+        "--tools",
+        ",".join(BUILTIN_TOOLS),
         "--disallowed-tools",
         ",".join(t for t in (disallowed_builtin_tools(), disallowed_mcp_tools(backend)) if t),
         "--system-prompt",
